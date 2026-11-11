@@ -815,6 +815,13 @@ td input[type=checkbox]{margin:0 6px 0 0;accent-color:var(--accent);vertical-ali
       <button type="button" class="btn" id="dclr">Limpar tudo</button>
       <input type="file" id="dfile" accept=".geojson,.json" hidden>
     </div>
+    <div class="brow" style="margin-top:8px">
+      <button type="button" class="btn pri" id="ghsave">Salvar no GitHub</button>
+      <button type="button" class="btn" id="ghload">Carregar do GitHub</button>
+      <button type="button" class="btn" id="ghtok">Token</button>
+    </div>
+    <label class="chk" style="margin-top:6px"><input type="checkbox" id="ghauto" checked><span>Salvar automaticamente a cada alteração</span></label>
+    <div class="dlive" id="ghst">GitHub: verificando…</div>
   </section>
   <section id="corsec">
     <h2>Corredor da estrada desenhada <span id="ccnt" style="font-weight:400;text-transform:none;letter-spacing:0"></span></h2>
@@ -1144,7 +1151,7 @@ treesSp(); treesLeg();
 const DK='upa01_draw_v1', DCOL={'Tronco':'#ff2bd6','Costela':'#c04dff','Outro':'#ffffff'};
 const dr={on:false,pts:[],lines:[],type:'Tronco',snap:true,cur:null,n:1};
 try{ const sv=JSON.parse(localStorage.getItem(DK)||'null'); if(sv&&sv.lines){dr.lines=sv.lines; dr.n=sv.n||dr.lines.length+1;} }catch(e){}
-const dsave=()=>{ try{localStorage.setItem(DK,JSON.stringify({lines:dr.lines,n:dr.n}));}catch(e){} };
+const dsave=()=>{ try{localStorage.setItem(DK,JSON.stringify({lines:dr.lines,n:dr.n}));}catch(e){} if(typeof ghSched==='function') ghSched(); };
 const dGroup=L.featureGroup().addTo(map);
 const dTmp=L.polyline([],{color:'#ff2bd6',weight:3,dashArray:'6 5',interactive:false}).addTo(map);
 const dPts=L.layerGroup().addTo(map);
@@ -1236,6 +1243,47 @@ $('dfile').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new 
   dRedraw(); $('dlive').textContent=n+' linhas importadas.'; }catch(err){ $('dlive').textContent='Arquivo inválido.'; } }; rd.readAsText(f); e.target.value=''; };
 $('dclr').onclick=()=>{ if(dr.lines.length&&!window.confirm('Apagar todas as linhas desenhadas?')) return; dr.lines=[]; dr.n=1; dRedraw(); };
 dButtons(); dRedraw();
+
+/* ===== Gravação no GitHub (arquivo estradas_upa01.json no repositório) ===== */
+var GH={repo:'claudeconta1987-code/upa01_jatuarana',path:'estradas_upa01.json',br:'main',sha:null,tk:'',timer:null,busy:false,again:false,ready:false,loading:false};
+const lsG=k=>{try{return localStorage.getItem(k);}catch(e){return null;}}, lsS=(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}};
+GH.tk=lsG('upa01_gh_tk')||''; $('ghauto').checked=lsG('upa01_gh_auto')!=='0';
+const ghUrl='https://api.github.com/repos/'+GH.repo+'/contents/'+GH.path;
+const ghHead=(w)=>{ const h={Accept:'application/vnd.github+json'}; if(GH.tk) h.Authorization='Bearer '+GH.tk; if(w) h['Content-Type']='application/json'; return h; };
+const ghMsg=t=>{ $('ghst').textContent=t; };
+const b64=t=>btoa(unescape(encodeURIComponent(t))), unb64=t=>decodeURIComponent(escape(atob(t.replace(/\s/g,''))));
+const hhmm=()=>new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+function ghToken(){ const t=window.prompt('Cole o token de acesso do GitHub (fine-grained, só neste repositório, permissão Contents: Read and write).\nFica salvo apenas neste navegador. Deixe em branco para remover.',GH.tk); if(t===null) return; GH.tk=t.trim(); lsS('upa01_gh_tk',GH.tk); ghMsg(GH.tk?'Token salvo neste navegador.':'Token removido.'); if(GH.tk&&lsG('upa01_gh_dirty')==='1') ghSched(); }
+async function ghLoad(manual){
+  try{ ghMsg('Carregando do GitHub…');
+    const r=await fetch(ghUrl+'?ref='+GH.br+'&_='+Date.now(),{headers:ghHead(),cache:'no-store'});
+    if(r.status===404){ GH.sha=null; GH.ready=true; if(dr.lines.length){ lsS('upa01_gh_dirty','1'); ghMsg('Ainda não há arquivo no GitHub. '+dr.lines.length+' linha(s) só neste navegador: clique em Salvar no GitHub.'); } else ghMsg('Nenhum traçado salvo no GitHub ainda.'); return; }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const j=await r.json(); GH.sha=j.sha; const d=JSON.parse(unb64(j.content||''));
+    if(!manual&&lsG('upa01_gh_dirty')==='1'){ GH.ready=true; ghMsg('Há alterações neste navegador ainda não salvas no GitHub. Clique em Salvar (ou em Carregar para descartá-las).'); return; }
+    GH.loading=true; dr.lines=d.lines||[]; dr.n=d.n||dr.lines.length+1; dRedraw(); GH.loading=false; GH.ready=true; lsS('upa01_gh_dirty','0');
+    ghMsg('Carregado do GitHub: '+dr.lines.length+' linha(s)'+(d.updated?' · salvo em '+new Date(d.updated).toLocaleString('pt-BR'):'')+'.');
+  }catch(e){ GH.loading=false; GH.ready=true; ghMsg('Não consegui ler o GitHub ('+e.message+'). Usando o que está neste navegador.'); } }
+function ghSched(){ if(!GH||GH.loading||!GH.ready) return; lsS('upa01_gh_dirty','1'); clearTimeout(GH.timer);
+  if(!$('ghauto').checked){ ghMsg('Alterações pendentes: clique em Salvar no GitHub.'); return; }
+  if(!GH.tk){ ghMsg('Alterações pendentes: falta o token (botão Token) para gravar no GitHub.'); return; }
+  ghMsg('Alterações pendentes… salvando em instantes.'); GH.timer=setTimeout(ghPush,2500); }
+async function ghPush(){
+  if(!GH.tk){ ghToken(); if(!GH.tk) return; }
+  if(GH.busy){ GH.again=true; return; } GH.busy=true; clearTimeout(GH.timer); ghMsg('Salvando no GitHub…');
+  try{
+    const body={message:'Traçado de estradas UPA 01 ('+dr.lines.length+' linhas)',content:b64(JSON.stringify({updated:new Date().toISOString(),n:dr.n,lines:dr.lines},null,1)),branch:GH.br}; if(GH.sha) body.sha=GH.sha;
+    const put=()=>fetch(ghUrl,{method:'PUT',headers:ghHead(true),body:JSON.stringify(body)});
+    let r=await put();
+    if(r.status===409||r.status===422){ const g=await fetch(ghUrl+'?ref='+GH.br+'&_='+Date.now(),{headers:ghHead(),cache:'no-store'}); if(g.ok){ body.sha=(await g.json()).sha; r=await put(); } }
+    if(r.status===401||r.status===403||r.status===404){ ghMsg('GitHub recusou ('+r.status+'): confira se o token vale para este repositório com Contents: Read and write.'); return; }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const j=await r.json(); GH.sha=j.content.sha; lsS('upa01_gh_dirty','0'); ghMsg('Salvo no GitHub às '+hhmm()+' · '+dr.lines.length+' linha(s).');
+  }catch(e){ ghMsg('Falha ao salvar ('+e.message+'). As alterações continuam neste navegador.'); }
+  finally{ GH.busy=false; if(GH.again){ GH.again=false; ghSched(); } } }
+$('ghsave').onclick=ghPush; $('ghload').onclick=()=>{ if(lsG('upa01_gh_dirty')==='1'&&!window.confirm('Descartar as alterações deste navegador e carregar o que está no GitHub?')) return; ghLoad(true); };
+$('ghtok').onclick=ghToken; $('ghauto').onchange=()=>{ lsS('upa01_gh_auto',$('ghauto').checked?'1':'0'); if($('ghauto').checked&&lsG('upa01_gh_dirty')==='1') ghSched(); };
+ghLoad(false);
 /* ===== Régua ===== */
 const rl={on:false,pts:[],done:false,cur:null};
 const rlGroup=L.layerGroup().addTo(map), rlLine=L.polyline([],{color:'#00e5ff',weight:3.5,opacity:.95,dashArray:'9 6',interactive:false}), rlGhost=L.polyline([],{color:'#00e5ff',weight:2,opacity:.8,dashArray:'3 6',interactive:false}), rlCur=L.circleMarker([0,0],{radius:3,opacity:0,fillOpacity:0,interactive:false});
