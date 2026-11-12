@@ -813,7 +813,7 @@ td input[type=checkbox]{margin:0 6px 0 0;accent-color:var(--accent);vertical-ali
       <button type="button" class="btn" id="dcopy">Copiar GeoJSON</button>
       <button type="button" class="btn" id="dimp">Importar</button>
       <button type="button" class="btn" id="dclr">Limpar tudo</button>
-      <input type="file" id="dfile" accept=".geojson,.json" hidden>
+      <input type="file" id="dfile" accept=".geojson,.json,.kml,application/vnd.google-earth.kml+xml" hidden>
     </div>
     <div class="brow" style="margin-top:8px">
       <button type="button" class="btn pri" id="ghsave">Salvar no GitHub</button>
@@ -1238,9 +1238,20 @@ $('dcopy').onclick=()=>{ if(!dr.lines.length){$('dlive').textContent='Nada desen
   const ok=()=>{$('dlive').textContent='GeoJSON copiado para a área de transferência.';};
   if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok,()=>{window.prompt('Copie (Ctrl+C):',t);}); else window.prompt('Copie (Ctrl+C):',t); };
 $('dimp').onclick=()=>$('dfile').click();
-$('dfile').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const g=JSON.parse(rd.result); let n=0;
-  (g.features||[]).forEach(ft=>{ if(ft.geometry&&ft.geometry.type==='LineString'){ const pr=ft.properties||{}; dr.lines.push({id:pr.id||('D'+String(dr.n++).padStart(2,'0')),tipo:['Tronco','Costela','Outro'].includes(pr.tipo)?pr.tipo:'Outro',pts:ft.geometry.coordinates.map(c=>[c[0],c[1]])}); n++; } });
-  dRedraw(); $('dlive').textContent=n+' linhas importadas.'; }catch(err){ $('dlive').textContent='Arquivo inválido.'; } }; rd.readAsText(f); e.target.value=''; };
+const tipoDe=t=>{ const x=String(t||'').toLowerCase(); return /costela/.test(x)?'Costela':/tronco|principal|acesso/.test(x)?'Tronco':['Tronco','Costela','Outro'].find(k=>k.toLowerCase()===x)||'Outro'; };
+function kmlLines(txt){ const doc=new DOMParser().parseFromString(txt,'application/xml'); if(doc.getElementsByTagName('parsererror').length) throw new Error('KML inválido'); const out=[];
+  const parse=c=>c.trim().split(/\s+/).map(q=>q.split(',').map(Number)).filter(q=>q.length>=2&&isFinite(q[0])&&isFinite(q[1])).map(q=>[q[0],q[1]]);
+  [...doc.getElementsByTagName('Placemark')].forEach(pm=>{ const gt=t=>{ const e=pm.getElementsByTagName(t)[0]; return e?e.textContent.trim():''; };
+    let nm=gt('name'), tp=''; [...pm.getElementsByTagName('SimpleData')].forEach(sd=>{ const k=sd.getAttribute('name'); if(k==='id'&&!nm) nm=sd.textContent.trim(); if(k==='tipo') tp=sd.textContent.trim(); });
+    const segs=[...pm.getElementsByTagName('LineString')].map(l=>{ const c=l.getElementsByTagName('coordinates')[0]; return c?parse(c.textContent):[]; });
+    [...pm.getElementsByTagName('gx:Track')].forEach(t=>segs.push([...t.getElementsByTagName('gx:coord')].map(e=>e.textContent.trim().split(/\s+/).map(Number)).filter(q=>q.length>=2&&isFinite(q[0])).map(q=>[q[0],q[1]])));
+    segs.filter(p=>p.length>=2).forEach((p,i)=>out.push({nm:nm&&segs.length>1?nm+'_'+(i+1):nm,tp:tp||nm,pts:p})); });
+  return out; }
+$('dfile').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const txt=String(rd.result).replace(/^﻿/,''); let n=0;
+  if(/^\s*</.test(txt)){ kmlLines(txt).forEach(l=>{ dr.lines.push({id:l.nm||('D'+String(dr.n++).padStart(2,'0')),tipo:tipoDe(l.tp),pts:l.pts}); n++; }); }
+  else { const g=JSON.parse(txt);
+    (g.features||[]).forEach(ft=>{ if(ft.geometry&&ft.geometry.type==='LineString'){ const pr=ft.properties||{}; dr.lines.push({id:pr.id||('D'+String(dr.n++).padStart(2,'0')),tipo:tipoDe(pr.tipo),pts:ft.geometry.coordinates.map(c=>[c[0],c[1]])}); n++; } }); }
+  dRedraw(); $('dlive').textContent=n?n+' linhas importadas.':'Nenhuma linha encontrada no arquivo (só LineString; polígonos e pontos são ignorados).'; }catch(err){ $('dlive').textContent='Arquivo inválido: '+err.message; } }; rd.readAsText(f); e.target.value=''; };
 $('dclr').onclick=()=>{ if(dr.lines.length&&!window.confirm('Apagar todas as linhas desenhadas?')) return; dr.lines=[]; dr.n=1; dRedraw(); };
 dButtons(); dRedraw();
 
