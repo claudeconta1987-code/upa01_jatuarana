@@ -733,6 +733,18 @@ td.hi{color:#d6453d;font-weight:600}
 .dlive{font-size:12.5px;color:var(--muted);margin-top:8px;min-height:18px;font-variant-numeric:tabular-nums}
 .inp{width:100%;font:inherit;font-size:12.5px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin-top:8px}
 .rng{width:100%;accent-color:var(--accent);margin:4px 0 0}
+#dapsec{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+#dapsec h3{font:600 11px/1 var(--font-body);text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:0 0 6px}
+.dhist{display:flex;align-items:flex-end;gap:2px;height:76px;margin-top:10px;border-bottom:1px solid var(--line)}
+.dhist i{flex:1;min-width:3px;border-radius:2px 2px 0 0;cursor:pointer;background:var(--line)}
+.dhist i.off{opacity:.28;filter:grayscale(1)}
+.dax{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px}
+.dsl{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;font-size:12.5px}
+#dtbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+#dtbl th{font-weight:600;color:var(--muted);text-align:right;padding:3px 4px;border-bottom:1px solid var(--line)}
+#dtbl th:first-child,#dtbl td:first-child{text-align:left}
+#dtbl td{padding:3px 4px;text-align:right;border-bottom:1px solid var(--line);cursor:pointer}
+#dtbl tr.tot td{font-weight:600;cursor:default}
 .spl{max-height:250px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:8px;padding:2px 8px}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;border:1.5px solid #123;vertical-align:-1px;margin-right:6px}
 tbody tr.off{opacity:.45} tbody tr.off td:first-child{text-decoration:line-through}
@@ -789,6 +801,19 @@ td input[type=checkbox]{margin:0 6px 0 0;accent-color:var(--accent);vertical-ali
     <input class="inp" type="search" id="tq" placeholder="Buscar espécie…" aria-label="Buscar espécie">
     <div class="brow"><button type="button" class="btn sm" id="tall">Todas</button><button type="button" class="btn sm" id="tnone">Nenhuma</button><button type="button" class="btn sm" id="ttop">10 maiores em volume</button></div>
     <div class="spl" id="tsp"></div>
+    <div id="dapsec">
+      <h3>Filtro de DAP por espécie</h3>
+      <select class="inp" id="dsp" style="margin-top:0" aria-label="Espécie para filtrar por DAP"></select>
+      <div class="dhist" id="dhist" title="Volume por classe de DAP (clique numa barra para usar só essa classe)"></div>
+      <div class="dax"><span id="dax0"></span><span>DAP (cm) · altura da barra = volume</span><span id="dax1"></span></div>
+      <div class="dsl">
+        <label>DAP mín: <b id="dminv">–</b> cm<input class="rng" type="range" id="dmin"></label>
+        <label>DAP máx: <b id="dmaxv">–</b> cm<input class="rng" type="range" id="dmax"></label>
+      </div>
+      <div class="src" id="dinfo" style="margin-top:6px"></div>
+      <div class="brow"><button type="button" class="btn sm" id="dapall">Aplicar faixa a todas</button><button type="button" class="btn sm" id="dapres">Limpar esta</button><button type="button" class="btn sm" id="dapresall">Limpar todas</button></div>
+      <table id="dtbl" hidden><thead><tr><th>Espécie com filtro</th><th>DAP (cm)</th><th>Árv.</th><th>m³</th></tr></thead><tbody></tbody></table>
+    </div>
     <div class="brow"><button type="button" class="btn" id="tsave">Baixar seleção (JSON)</button></div>
   </section>
   <section id="drawsec">
@@ -1019,6 +1044,8 @@ const TR=D.trees, TN=TR.t.length, KX=111320*Math.cos(-7.47*Math.PI/180), KY=1105
 const TXm=new Float64Array(TN), TYm=new Float64Array(TN), TD=new Float32Array(TN).fill(999);
 TR.t.forEach((r,i)=>{ TXm[i]=(r[0]+59.7)*KX; TYm[i]=(r[1]+7.47)*KY; });
 const tsel=new Uint8Array(TR.sp.length); TR.spl.forEach(x=>tsel[x[0]]=1);
+const tmin=new Float32Array(TR.sp.length), tmax=new Float32Array(TR.sp.length).fill(999);
+const tok=r=>tsel[r[2]]&&r[4]>=tmin[r[2]]&&r[4]<=tmax[r[2]];
 const tst={on:true,R:300,q:'',scope:'all',mode:'sp',anySrc:false};
 const PAL=['#e6194b','#f58231','#ffe119','#3cb44b','#17becf','#911eb4','#f032e6','#a65628','#00a86b','#ff9da7','#bcbd22','#7f7f7f','#d4145a','#00bfff','#8c564b','#ffd700'];
 const SPC=new Array(TR.sp.length).fill('#999');
@@ -1050,7 +1077,7 @@ function treesDraw(){
   const z=map.getZoom(), RZ=[[12,1.3],[13,1.6],[14,2.6],[15,4],[16,5.2],[17,6.5]]; let rad=RZ[RZ.length-1][1]; if(z<=RZ[0][0]) rad=RZ[0][1]; else for(let k=1;k<RZ.length;k++) if(z<=RZ[k][0]){ const a=RZ[k-1],b=RZ[k]; rad=a[1]+(b[1]-a[1])*(z-a[0])/(b[0]-a[0]); break; } const R=tst.R;
   const stroke=z>=14.5; g.lineWidth=stroke?1:0; g.strokeStyle='rgba(10,20,15,.85)';
   const batch=(idxs,color,alpha,cov,ring)=>{ g.globalAlpha=alpha; const rr=ring?rad*1.25:rad; g.fillStyle=color; g.beginPath(); let any=false;
-    for(let q=0;q<idxs.length;q++){ const i=idxs[q]; if((TD[i]<=R)!==cov) continue; const r=TR.t[i];
+    for(let q=0;q<idxs.length;q++){ const i=idxs[q]; if((TD[i]<=R)!==cov) continue; const r=TR.t[i]; if(r[4]<tmin[r[2]]||r[4]>tmax[r[2]]) continue;
       const p=map.latLngToContainerPoint([r[1],r[0]]); if(p.x<-8||p.y<-8||p.x>sz.x+8||p.y>sz.y+8) continue; g.moveTo(p.x+rr,p.y); g.arc(p.x,p.y,rr,0,6.2832); any=true; }
     if(any){ g.fill(); if(ring){ if(stroke){ g.lineWidth=1.3; g.strokeStyle='#fff'; g.stroke(); } g.lineWidth=stroke?1:0; g.strokeStyle='rgba(10,20,15,.85)'; } else if(stroke) g.stroke(); } };
   if(tst.mode==='cov'){ const all=[]; for(let k=0;k<TBY.length;k++) if(tsel[k]) for(const i of TBY[k]) all.push(i); batch(all,'#ffe600',1,false); batch(all,'#00c26e',1,true); }
@@ -1080,7 +1107,7 @@ function treesLeg(){
 }
 function treesStats(){
   let n=0,v=0,nc=0,vc=0; const R=tst.R;
-  for(let i=0;i<TN;i++){ const r=TR.t[i]; if(!tsel[r[2]]) continue; n++; v+=r[3]; if(TD[i]<=R){nc++; vc+=r[3];} }
+  for(let i=0;i<TN;i++){ const r=TR.t[i]; if(!tok(r)) continue; n++; v+=r[3]; if(TD[i]<=R){nc++; vc+=r[3];} }
   const sp=TR.spl.filter(x=>tsel[x[0]]).length;
   const tile=(b,t)=>`<div class="stat"><b>${b}</b><span>${t}</span></div>`;
   $('tstats').innerHTML=tile(f0(n),`árvores de ${sp} ${sp===1?'espécie':'espécies'} (${f0(v)} m³)`)+tile((v?f1(vc/v*100):'0,0')+'%',`do volume a ≤${R} m de estrada ativa`)+tile(f0(n-nc),`árvores fora do alcance (${f0(v-vc)} m³)`)+tile(f0(nc),`árvores ao alcance (${f0(vc)} m³)`);
@@ -1096,7 +1123,7 @@ function owners(withPrev){   // cada árvore pertence só à estrada mais próxi
 }
 function corAgg(O,ids,ignoreSel){
   const nsp=TR.sp.length, N=new Float64Array(nsp), V=new Float64Array(nsp); let n=0,v=0; const set=ids?new Set(ids):null;
-  for(let i=0;i<TN;i++){ const k=O.own[i]; if(k<0) continue; if(set&&!set.has(O.srcs[k].id)) continue; const r=TR.t[i]; if(!ignoreSel&&!tsel[r[2]]) continue; N[r[2]]++; V[r[2]]+=r[3]; n++; v+=r[3]; }
+  for(let i=0;i<TN;i++){ const k=O.own[i]; if(k<0) continue; if(set&&!set.has(O.srcs[k].id)) continue; const r=TR.t[i]; if(!ignoreSel&&!tok(r)) continue; N[r[2]]++; V[r[2]]+=r[3]; n++; v+=r[3]; }
   const rows=[]; for(let k=0;k<nsp;k++) if(N[k]) rows.push([k,N[k],V[k]]); rows.sort((a,b)=>b[2]-a[2]);
   return {n,v,rows};
 }
@@ -1115,10 +1142,11 @@ function corUI(){
   $('ccnt').textContent=dr.lines.length?'('+dr.lines.length+' linha'+(dr.lines.length>1?'s':'')+')':'';
 }
 function treesSp(){
+  spAgg();
   const q=tst.q.trim().toLowerCase(), nrm=s=>s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
-  $('tsp').innerHTML=TR.spl.filter(x=>!q||nrm(TR.sp[x[0]]).includes(nrm(q))).map(x=>`<label class="chk"><input type="checkbox" data-sp="${x[0]}" ${tsel[x[0]]?'checked':''}><span><i class="dot" style="background:${SPC[x[0]]}"></i>${esc(TR.sp[x[0]])}</span><span class="n">${f0(x[1])} · ${f0(x[2])} m³</span></label>`).join('')||'<p class="src" style="padding:8px 0">Nenhuma espécie encontrada.</p>';
+  $('tsp').innerHTML=TR.spl.filter(x=>!q||nrm(TR.sp[x[0]]).includes(nrm(q))).map(x=>`<label class="chk"><input type="checkbox" data-sp="${x[0]}" ${tsel[x[0]]?'checked':''}><span><i class="dot" style="background:${SPC[x[0]]}"></i>${esc(TR.sp[x[0]])}</span><span class="n"${FN[x[0]]!==x[1]?' title="filtrado por DAP · total: '+f0(x[1])+' árv. / '+f0(x[2])+' m³" style="color:var(--accent);font-weight:600"':''}>${f0(FN[x[0]])} · ${f0(FV[x[0]])} m³</span></label>`).join('')||'<p class="src" style="padding:8px 0">Nenhuma espécie encontrada.</p>';
 }
-const spChanged=()=>{ treesStats(); treesDraw(); if(typeof dr!=='undefined') dRedraw(true); corUI(); };
+const spChanged=()=>{ dapUI(); treesStats(); treesDraw(); if(typeof dr!=='undefined') dRedraw(true); corUI(); };
 $('tmode').onclick=e=>{const b=e.target.closest('button');if(!b)return;tst.mode=b.dataset.m;[...$('tmode').children].forEach(x=>x.setAttribute('aria-pressed',x===b));treesLeg();treesDraw();};
 $('ton').onchange=e=>{tst.on=e.target.checked;treesDraw();};
 $('rr').oninput=e=>{tst.R=+e.target.value;$('rval').textContent=tst.R; TG=null; if(typeof dr!=='undefined'){ dRedraw(); corPreview(); } else treesRecalc(); };
@@ -1133,8 +1161,8 @@ $('ccsv').onclick=()=>{ const a=corAgg(owners(true),tst.scope==='all'?null:[tst.
   const fm=n=>String(Math.round(n*10)/10).replace('.',','); const lines=[`Corredor: ${sc};;;`,`Distância de cada lado (m);${tst.R};;`,'Espécie;Árvores;Volume (m³);% do volume'].concat(a.rows.map(r=>`${TR.sp[r[0]]};${r[1]};${fm(r[2])};${fm(r[2]/a.v*100)}`),[`Total;${a.n};${fm(a.v)};100`]);
   dl('corredor_especies_UPA01.csv','﻿'+lines.join('\r\n'),'text/csv;charset=utf-8'); };
 $('tsave').onclick=()=>{
-  const R=tst.R; let n=0,v=0,nc=0,vc=0; TR.t.forEach((r,i)=>{ if(!tsel[r[2]]) return; n++; v+=r[3]; if(TD[i]<=R){nc++;vc+=r[3];} });
-  const o={distancia_cada_lado_m:R,especies:TR.spl.filter(x=>tsel[x[0]]).map(x=>TR.sp[x[0]]),arvores:n,volume_m3:Math.round(v*10)/10,cobertura_volume_pct:v?Math.round(vc/v*1000)/10:0,
+  const R=tst.R; let n=0,v=0,nc=0,vc=0; TR.t.forEach((r,i)=>{ if(!tok(r)) return; n++; v+=r[3]; if(TD[i]<=R){nc++;vc+=r[3];} });
+  const o={filtro_dap_cm:dapList().map(x=>({especie:x.nome,dap_min:x.lo,dap_max:x.hi})),distancia_cada_lado_m:R,especies:TR.spl.filter(x=>tsel[x[0]]).map(x=>TR.sp[x[0]]),arvores:n,volume_m3:Math.round(v*10)/10,cobertura_volume_pct:v?Math.round(vc/v*1000)/10:0,
     estradas_desativadas:[...st.off],tracados_desenhados:(typeof dr!=='undefined'?dr.lines.map(x=>({id:x.id,tipo:x.tipo,ativa:!x.off})):[])};
   dl('selecao_especies_UPA01.json',JSON.stringify(o,null,1),'application/json'); };
 map.on('move zoomend resize viewreset',treesDraw);
@@ -1142,10 +1170,51 @@ map.on('zoomanim',e=>{ const sc=map.getZoomScale(e.zoom), off=map._latLngToNewLa
 map.on('click',e=>{
   if(rulerOn||(typeof dr!=='undefined'&&dr.on)) return; if(!tst.on) return;
   const pc=map.latLngToContainerPoint(e.latlng); let best=-1,bd=8;
-  for(let i=0;i<TN;i++){ const r=TR.t[i]; if(!tsel[r[2]]) continue; const p=map.latLngToContainerPoint([r[1],r[0]]); const d=Math.hypot(p.x-pc.x,p.y-pc.y); if(d<bd){bd=d;best=i;} }
+  for(let i=0;i<TN;i++){ const r=TR.t[i]; if(!tok(r)) continue; const p=map.latLngToContainerPoint([r[1],r[0]]); const d=Math.hypot(p.x-pc.x,p.y-pc.y); if(d<bd){bd=d;best=i;} }
   if(best<0) return; const r=TR.t[best], ut=(D.uts.find(u=>parseInt(u.ut,10)===r[6])||{ut:r[6]}).ut;
   L.popup().setLatLng([r[1],r[0]]).setContent(`<b><i class="dot" style="background:${SPC[r[2]]}"></i>${esc(TR.sp[r[2]])}</b><div class="pk"><span>UT</span><span>${esc(ut)}</span><span>Faixa / nº</span><span>${r[7]||'–'} / ${r[8]||'–'}</span><span>DAP</span><span>${f1(r[4])} cm</span><span>Altura comercial</span><span>${f1(r[5])} m</span><span>Volume</span><span>${f2(r[3])} m³</span><span>Estrada ativa mais próxima</span><span>${TD[best]<999?f0(TD[best])+' m':'> '+tst.R+' m'}</span></div>`).openOn(map); });
-treesSp(); treesLeg();
+
+/* ===== Filtro de DAP por espécie ===== */
+const DAPK='upa01_dap_v1', NSP=TR.sp.length;
+let FN=new Float64Array(NSP), FV=new Float64Array(NSP);
+const SPR=[]; const spRange=k=>{ if(SPR[k]) return SPR[k]; let lo=1e9,hi=-1; for(const i of TBY[k]){ const d=TR.t[i][4]; if(d<lo)lo=d; if(d>hi)hi=d; } return SPR[k]=hi<0?[0,5]:[Math.floor(lo/5)*5,Math.ceil(hi/5)*5]; };
+function spAgg(){ FN.fill(0); FV.fill(0); for(let i=0;i<TN;i++){ const r=TR.t[i]; if(r[4]<tmin[r[2]]||r[4]>tmax[r[2]]) continue; FN[r[2]]++; FV[r[2]]+=r[3]; } }
+const dapOn=k=>tmin[k]>0||tmax[k]<999;
+function dapList(){ return TR.spl.filter(x=>dapOn(x[0])).map(x=>{ const k=x[0], r=spRange(k); return {k,nome:TR.sp[k],lo:tmin[k]>0?Math.round(tmin[k]):r[0],hi:tmax[k]<999?Math.round(tmax[k]):r[1]}; }); }
+function dapSave(){ try{ const o={}; TR.spl.forEach(x=>{ const k=x[0]; if(dapOn(k)) o[TR.sp[k]]=[tmin[k],tmax[k]]; }); localStorage.setItem(DAPK,JSON.stringify(o)); }catch(e){} }
+try{ const o=JSON.parse(localStorage.getItem(DAPK)||'{}'); TR.sp.forEach((n,k)=>{ if(o[n]){ tmin[k]=+o[n][0]||0; tmax[k]=o[n][1]==null?999:+o[n][1]; } }); }catch(e){}
+const dap={k:TR.spl[0][0]};
+$('dsp').innerHTML=TR.spl.map(x=>`<option value="${x[0]}">${esc(TR.sp[x[0]])} · ${f0(x[1])} árv. · ${f0(x[2])} m³</option>`).join('');
+function dapUI(){
+  const k=dap.k, [lo,hi]=spRange(k), a=$('dmin'), b=$('dmax'); $('dsp').value=k;
+  a.min=b.min=lo; a.max=b.max=hi; a.step=b.step=5;
+  const vmin=tmin[k]>0?Math.max(lo,Math.round(tmin[k])):lo, vmax=tmax[k]<999?Math.min(hi,Math.round(tmax[k])):hi;
+  a.value=vmin; b.value=vmax; $('dminv').textContent=vmin; $('dmaxv').textContent=vmax;
+  // histograma (todas as árvores da espécie; fora da faixa em cinza)
+  const w=(hi-lo)<=160?10:20, base=Math.floor(lo/w)*w, nb=Math.max(1,Math.ceil((hi-base)/w)), C=new Float64Array(nb), V=new Float64Array(nb);
+  for(const i of TBY[k]){ const r=TR.t[i], c=Math.min(nb-1,Math.floor((r[4]-base)/w)); C[c]++; V[c]+=r[3]; }
+  const mx=Math.max(...V,1e-9);
+  $('dhist').innerHTML=Array.from(V,(v,c)=>{ const c0=base+c*w, c1=c0+w, on=c1>tmin[k]&&c0<=tmax[k]; return `<i data-c="${c}" class="${on?'':'off'}" style="height:${Math.max(2,v/mx*100)}%;background:${on?SPC[k]:''}" title="${c0}–${c1} cm: ${f0(C[c])} árv. · ${f1(v)} m³${C[c]?' · '+f2(v/C[c])+' m³/árv.':''}"></i>`; }).join('');
+  $('dhist').dataset.lo=base; $('dhist').dataset.w=w; $('dax0').textContent=base; $('dax1').textContent=base+nb*w;
+  const tot=TR.spl.find(x=>x[0]===k);
+  $('dinfo').innerHTML=dapOn(k)?`<b>${f0(FN[k])}</b> de ${f0(tot[1])} árvores · <b>${f0(FV[k])}</b> de ${f0(tot[2])} m³ (${f1(FV[k]/tot[2]*100)}%) com DAP ${vmin}–${vmax} cm`:`Sem filtro: todas as ${f0(tot[1])} árvores (${f0(tot[2])} m³), DAP ${lo}–${hi} cm.`;
+  const L=dapList(), T=$('dtbl'); T.hidden=!L.length;
+  let sn=0,sv=0,tn=0,tv=0;
+  T.tBodies[0].innerHTML=L.map(x=>{ const t=TR.spl.find(y=>y[0]===x.k); sn+=FN[x.k]; sv+=FV[x.k]; tn+=t[1]; tv+=t[2]; return `<tr data-k="${x.k}"><td><i class="dot" style="background:${SPC[x.k]}"></i>${esc(x.nome)}</td><td>${x.lo}–${x.hi}</td><td>${f0(FN[x.k])}/${f0(t[1])}</td><td>${f0(FV[x.k])}/${f0(t[2])}</td></tr>`; }).join('')+(L.length>1?`<tr class="tot"><td>Soma (espécies filtradas)</td><td></td><td>${f0(sn)}/${f0(tn)}</td><td>${f0(sv)}/${f0(tv)}</td></tr>`:'');
+}
+function dapApply(){ dapSave(); treesSp(); spChanged(); }
+function dapSet(k,mn,mx){ const [lo,hi]=spRange(k); tmin[k]=mn<=lo?0:mn; tmax[k]=mx>=hi?999:mx; }
+$('dsp').onchange=e=>{ dap.k=+e.target.value; dapUI(); };
+$('dmin').oninput=()=>{ let a=+$('dmin').value, b=+$('dmax').value; if(a>b){ b=a; } dapSet(dap.k,a,b); dapApply(); };
+$('dmax').oninput=()=>{ let a=+$('dmin').value, b=+$('dmax').value; if(b<a){ a=b; } dapSet(dap.k,a,b); dapApply(); };
+$('dhist').onclick=e=>{ const el=e.target.closest('i'); if(!el) return; const H=$('dhist'), lo=+H.dataset.lo, w=+H.dataset.w, c=+el.dataset.c, k=dap.k, r=spRange(k);
+  const c0=lo+c*w, c1=c0+w-0.01; if(e.shiftKey&&dapOn(k)){ dapSet(k,Math.min(c0,tmin[k]>0?tmin[k]:r[0]),Math.max(c1,tmax[k]<999?tmax[k]:r[1])); } else dapSet(k,c0,c1); dapApply(); };
+$('dapres').onclick=()=>{ tmin[dap.k]=0; tmax[dap.k]=999; dapApply(); };
+$('dapresall').onclick=()=>{ tmin.fill(0); tmax.fill(999); dapApply(); };
+$('dapall').onclick=()=>{ const k=dap.k; if(!dapOn(k)){ window.alert('Defina primeiro uma faixa de DAP para esta espécie (sliders ou clique no histograma).'); return; }
+  const mn=tmin[k], mx=tmax[k]; TR.spl.forEach(x=>{ tmin[x[0]]=mn; tmax[x[0]]=mx; }); dapApply(); };
+$('dtbl').tBodies[0].onclick=e=>{ const tr=e.target.closest('tr[data-k]'); if(!tr) return; dap.k=+tr.dataset.k; dapUI(); };
+treesSp(); dapUI(); treesLeg();
 
 /* ===== Desenho de traçado ===== */
 const DK='upa01_draw_v1', DCOL={'Tronco':'#ff2bd6','Costela':'#c04dff','Outro':'#ffffff'};
