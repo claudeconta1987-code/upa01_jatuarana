@@ -818,6 +818,10 @@ td input[type=checkbox]{margin:0 6px 0 0;accent-color:var(--accent);vertical-ali
         <label>DAP mín: <b id="dminv">–</b><input class="rng" type="range" id="dmin"></label>
         <label>DAP máx: <b id="dmaxv">–</b><input class="rng" type="range" id="dmax"></label>
       </div>
+      <div class="dsl" style="margin-top:6px">
+        <label>CAP mín (cm)<input class="inp" type="text" inputmode="numeric" autocomplete="off" id="dcmin" placeholder="sem mínimo" style="margin-top:2px"></label>
+        <label>CAP máx (cm)<input class="inp" type="text" inputmode="numeric" autocomplete="off" id="dcmax" placeholder="sem máximo" style="margin-top:2px"></label>
+      </div>
       <div class="src" id="dinfo" style="margin-top:6px"></div>
       <div class="brow"><button type="button" class="btn sm" id="dapall">Aplicar faixa a todas</button><button type="button" class="btn sm" id="dapres">Limpar esta</button><button type="button" class="btn sm" id="dapresall">Limpar todas</button></div>
       <table id="dtbl" hidden><thead><tr><th>Espécie com filtro</th><th>DAP (cm)</th><th>Árv.</th><th>m³</th></tr></thead><tbody></tbody></table>
@@ -1153,9 +1157,10 @@ function corUI(){
   $('ccnt').textContent=dr.lines.length?'('+dr.lines.length+' linha'+(dr.lines.length>1?'s':'')+')':'';
 }
 function treesSp(){
-  spAgg();
+  spAgg(); const AE=(document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.cap!==undefined)?document.activeElement:null, AP=AE?AE.selectionStart:null;
   const q=tst.q.trim().toLowerCase(), nrm=s=>s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
-  $('tsp').innerHTML=TR.spl.filter(x=>!q||nrm(TR.sp[x[0]]).includes(nrm(q))).map(x=>`<div class="sr"><label class="chk"><input type="checkbox" data-sp="${x[0]}" ${tsel[x[0]]?'checked':''}><span><i class="dot" style="background:${SPC[x[0]]}"></i>${esc(TR.sp[x[0]])}</span><span class="n"${FN[x[0]]!==x[1]?' title="filtrado por DAP · total: '+f0(x[1])+' árv. / '+f0(x[2])+' m³" style="color:var(--accent);font-weight:600"':''}>${f0(FN[x[0]])} · ${f0(FV[x[0]])} m³</span></label><input class="cap${tmin[x[0]]>0?' on':''}" type="number" min="0" step="1" inputmode="numeric" data-cap="${x[0]}" value="${tmin[x[0]]>0?Math.round(tmin[x[0]]*Math.PI):''}" placeholder="CAP" title="CAP mínimo de exploração (cm) · DAP = CAP ÷ π${tmin[x[0]]>0?' = '+f1(tmin[x[0]])+' cm':''}" aria-label="CAP mínimo de exploração de ${esc(TR.sp[x[0]])}"></div>`).join('')||'<p class="src" style="padding:8px 0">Nenhuma espécie encontrada.</p>';
+  $('tsp').innerHTML=TR.spl.filter(x=>!q||nrm(TR.sp[x[0]]).includes(nrm(q))).map(x=>`<div class="sr"><label class="chk"><input type="checkbox" data-sp="${x[0]}" ${tsel[x[0]]?'checked':''}><span><i class="dot" style="background:${SPC[x[0]]}"></i>${esc(TR.sp[x[0]])}</span><span class="n"${FN[x[0]]!==x[1]?' title="filtrado por DAP · total: '+f0(x[1])+' árv. / '+f0(x[2])+' m³" style="color:var(--accent);font-weight:600"':''}>${f0(FN[x[0]])} · ${f0(FV[x[0]])} m³</span></label><input class="cap${tmin[x[0]]>0?' on':''}" type="text" inputmode="numeric" autocomplete="off" data-cap="${x[0]}" value="${(AE&&AE.dataset.cap==String(x[0]))?esc(AE.value):(tmin[x[0]]>0?Math.round(tmin[x[0]]*Math.PI):'')}" placeholder="CAP" title="CAP mínimo de exploração (cm) · DAP = CAP ÷ π${tmin[x[0]]>0?' = '+f1(tmin[x[0]])+' cm':''}" aria-label="CAP mínimo de exploração de ${esc(TR.sp[x[0]])}"></div>`).join('')||'<p class="src" style="padding:8px 0">Nenhuma espécie encontrada.</p>';
+  if(AE){ const n=$('tsp').querySelector('[data-cap="'+AE.dataset.cap+'"]'); if(n){ n.focus(); try{ n.setSelectionRange(AP,AP); }catch(e){} } }
 }
 const spChanged=()=>{ dapUI(); treesStats(); treesDraw(); if(typeof dr!=='undefined') dRedraw(true); corUI(); };
 $('tmode').onclick=e=>{const b=e.target.closest('button');if(!b)return;tst.mode=b.dataset.m;[...$('tmode').children].forEach(x=>x.setAttribute('aria-pressed',x===b));treesLeg();treesDraw();};
@@ -1164,7 +1169,11 @@ $('ton').onchange=e=>{tst.on=e.target.checked;treesDraw();};
 $('rr').oninput=e=>{tst.R=+e.target.value;$('rval').textContent=tst.R; TG=null; if(typeof dr!=='undefined'){ dRedraw(); corPreview(); } else treesRecalc(); };
 $('tq').oninput=e=>{tst.q=e.target.value;treesSp();};
 $('tsp').onchange=e=>{const t=e.target; if(t.dataset.sp===undefined) return; tsel[+t.dataset.sp]=t.checked?1:0; spChanged();};
-$('tsp').addEventListener('change',e=>{ const t=e.target; if(t.dataset.cap===undefined) return; const k=+t.dataset.cap, c=parseFloat(String(t.value).replace(',','.')); tmin[k]=(isFinite(c)&&c>0)?c/Math.PI:0; dapSave(); treesSp(); spChanged(); });
+const capNum=v=>{ const c=parseFloat(String(v).replace(',','.')); return isFinite(c)&&c>0?c:0; };
+const capT={}; const deb=(f,key='x')=>{ clearTimeout(capT[key]); capT[key]=setTimeout(f,350); };
+const capSp=t=>{ const k=+t.dataset.cap, c=capNum(t.value); tmin[k]=c?c/Math.PI:0; dapSave(); treesSp(); spChanged(); };
+$('tsp').addEventListener('input',e=>{ const t=e.target; if(t.dataset.cap===undefined) return; t.value=t.value.replace(/[^0-9.,]/g,''); deb(()=>capSp(t),'sp'+t.dataset.cap); });
+$('tsp').addEventListener('change',e=>{ const t=e.target; if(t.dataset.cap===undefined) return; clearTimeout(capT['sp'+t.dataset.cap]); capSp(t); });
 $('tall').onclick=()=>{TR.spl.forEach(x=>tsel[x[0]]=1);treesSp();spChanged();};
 $('tnone').onclick=()=>{TR.spl.forEach(x=>tsel[x[0]]=0);treesSp();spChanged();};
 $('ttop').onclick=()=>{TR.spl.forEach((x,i)=>tsel[x[0]]=i<10?1:0);treesSp();spChanged();};
@@ -1264,7 +1273,8 @@ function dapUI(){
   const k=dap.k, [lo,hi]=spRange(k), a=$('dmin'), b=$('dmax'); $('dsp').value=k;
   a.min=b.min=lo; a.max=b.max=hi; a.step=b.step=5;
   const vmin=tmin[k]>0?Math.max(lo,Math.round(tmin[k])):lo, vmax=tmax[k]<999?Math.min(hi,Math.round(tmax[k])):hi;
-  a.value=vmin; b.value=vmax; $('dminv').textContent=vmin+' (CAP '+Math.round(vmin*Math.PI)+')'; $('dmaxv').textContent=vmax+' (CAP '+Math.round(vmax*Math.PI)+')';
+  a.value=vmin; b.value=vmax;
+  if(document.activeElement!==$('dcmin')) $('dcmin').value=tmin[k]>0?Math.round(tmin[k]*Math.PI):''; if(document.activeElement!==$('dcmax')) $('dcmax').value=tmax[k]<999?Math.round(tmax[k]*Math.PI):''; $('dminv').textContent=vmin+' (CAP '+Math.round(vmin*Math.PI)+')'; $('dmaxv').textContent=vmax+' (CAP '+Math.round(vmax*Math.PI)+')';
   // histograma (todas as árvores da espécie; fora da faixa em cinza)
   const w=(hi-lo)<=160?10:20, base=Math.floor(lo/w)*w, nb=Math.max(1,Math.ceil((hi-base)/w)), C=new Float64Array(nb), V=new Float64Array(nb);
   for(const i of TBY[k]){ const r=TR.t[i], c=Math.min(nb-1,Math.floor((r[4]-base)/w)); C[c]++; V[c]+=r[3]; }
@@ -1284,6 +1294,8 @@ $('dmin').oninput=()=>{ let a=+$('dmin').value, b=+$('dmax').value; if(a>b){ b=a
 $('dmax').oninput=()=>{ let a=+$('dmin').value, b=+$('dmax').value; if(b<a){ a=b; } dapSet(dap.k,a,b); dapApply(); };
 $('dhist').onclick=e=>{ const el=e.target.closest('i'); if(!el) return; const H=$('dhist'), lo=+H.dataset.lo, w=+H.dataset.w, c=+el.dataset.c, k=dap.k, r=spRange(k);
   const c0=lo+c*w, c1=c0+w-0.01; if(e.shiftKey&&dapOn(k)){ dapSet(k,Math.min(c0,tmin[k]>0?tmin[k]:r[0]),Math.max(c1,tmax[k]<999?tmax[k]:r[1])); } else dapSet(k,c0,c1); dapApply(); };
+$('dcmin').oninput=()=>{ const el=$('dcmin'); el.value=el.value.replace(/[^0-9.,]/g,''); deb(()=>{ const c=capNum(el.value); tmin[dap.k]=c?c/Math.PI:0; dapApply(); },'dcmin'); };
+$('dcmax').oninput=()=>{ const el=$('dcmax'); el.value=el.value.replace(/[^0-9.,]/g,''); deb(()=>{ const c=capNum(el.value); tmax[dap.k]=c?c/Math.PI:999; dapApply(); },'dcmax'); };
 $('dapres').onclick=()=>{ tmin[dap.k]=0; tmax[dap.k]=999; dapApply(); };
 $('dapresall').onclick=()=>{ tmin.fill(0); tmax.fill(999); dapApply(); };
 $('dapall').onclick=()=>{ const k=dap.k; if(!dapOn(k)){ window.alert('Defina primeiro uma faixa de DAP para esta espécie (sliders ou clique no histograma).'); return; }
