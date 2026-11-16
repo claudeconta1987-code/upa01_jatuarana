@@ -862,7 +862,8 @@ td input[type=checkbox]{margin:0 6px 0 0;accent-color:var(--accent);vertical-ali
     <select class="inp" id="cscope" aria-label="Escopo do corredor" style="margin-top:0"></select>
     <div class="stats" id="cstats" style="margin-top:10px"></div>
     <div class="tw" style="max-height:320px;overflow:auto;margin-top:10px"><table id="ctbl"><thead><tr><th>Espécie</th><th>Árv.</th><th>m³</th><th>%</th></tr></thead><tbody></tbody></table></div>
-    <div class="brow"><button type="button" class="btn" id="ccsv">Baixar tabela (CSV)</button></div>
+    <div class="brow"><button type="button" class="btn pri" id="ccsv">Baixar CSV (todas as árvores)</button><button type="button" class="btn" id="ccsvs">CSV resumo por espécie</button></div>
+    <div class="src" id="ccsvn" style="margin-top:4px"></div>
   </section>
   <section hidden>
     <h2>Trechos <span id="cnt" style="font-weight:400;text-transform:none;letter-spacing:0"></span></h2>
@@ -1169,7 +1170,21 @@ $('tnone').onclick=()=>{TR.spl.forEach(x=>tsel[x[0]]=0);treesSp();spChanged();};
 $('ttop').onclick=()=>{TR.spl.forEach((x,i)=>tsel[x[0]]=i<10?1:0);treesSp();spChanged();};
 $('cscope').onchange=e=>{tst.scope=e.target.value;corUI();};
 function dl(name,text,mime){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:mime})); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500); }
-$('ccsv').onclick=()=>{ const a=corAgg(owners(true),tst.scope==='all'?null:[tst.scope]); if(!a.rows.length) return; const sc=$('cscope').selectedOptions[0].textContent;
+/* CSV com todas as árvores do corredor (a ≤R m da estrada mais próxima; respeita espécies, DAP/CAP, escopo e chave do buffer) */
+$('ccsv').onclick=()=>{
+  const O=owners(true), set=tst.scope==='all'?null:new Set([tst.scope]), rows=[];
+  for(let i=0;i<TN;i++){ const k=O.own[i]; if(k<0) continue; const src=O.srcs[k]; if(set&&!set.has(src.id)) continue; const r=TR.t[i]; if(!tok(r)) continue;
+    const ln=src.id==='prev'?{id:'(em desenho)',tipo:''}:dr.lines[+src.id]; rows.push({ln,r,d:src.d[i]}); }
+  if(!rows.length){ $('ccsvn').textContent='Nenhuma árvore no corredor para exportar (desenhe uma estrada ativa e confira os filtros).'; return; }
+  rows.sort((a,b)=>(a.ln.id<b.ln.id?-1:a.ln.id>b.ln.id?1:0)||TR.sp[a.r[2]].localeCompare(TR.sp[b.r[2]],'pt-BR')||b.r[3]-a.r[3]);
+  const fm=(n,d)=>(Math.round(n*Math.pow(10,d))/Math.pow(10,d)).toFixed(d).replace('.',','), q=v=>/[;"\n]/.test(String(v))?'"'+String(v).replace(/"/g,'""')+'"':v;
+  const head=['Estrada','Tipo','UT','Faixa','Nº árvore','Espécie','DAP (cm)','CAP (cm)','Altura comercial (m)','Volume (m³)','Distância à estrada (m)','Longitude','Latitude'];
+  const out=[head.join(';')].concat(rows.map(({ln,r,d})=>{ const ut=(D.uts.find(u=>parseInt(u.ut,10)===r[6])||{ut:r[6]}).ut;
+    return [q(ln.id),ln.tipo,q(ut),r[7]||'',r[8]||'',q(TR.sp[r[2]]),fm(r[4],1),fm(r[4]*Math.PI,0),fm(r[5],1),fm(r[3],3),fm(d,0),r[0].toFixed(6).replace('.',','),r[1].toFixed(6).replace('.',',')].join(';'); }));
+  const v=rows.reduce((a,x)=>a+x.r[3],0);
+  dl('arvores_corredor_UPA01.csv','﻿'+out.join('\r\n'),'text/csv;charset=utf-8');
+  $('ccsvn').textContent=`CSV gerado: ${f0(rows.length)} árvores · ${f0(v)} m³ (${tst.scope==='all'?'todas as linhas ativas':$('cscope').selectedOptions[0].textContent}, ≤${tst.R} m, filtros de espécie/DAP aplicados).`; };
+$('ccsvs').onclick=()=>{ const a=corAgg(owners(true),tst.scope==='all'?null:[tst.scope]); if(!a.rows.length) return; const sc=$('cscope').selectedOptions[0].textContent;
   const fm=n=>String(Math.round(n*10)/10).replace('.',','); const lines=[`Corredor: ${sc};;;`,`Distância de cada lado (m);${tst.R};;`,'Espécie;Árvores;Volume (m³);% do volume'].concat(a.rows.map(r=>`${TR.sp[r[0]]};${r[1]};${fm(r[2])};${fm(r[2]/a.v*100)}`),[`Total;${a.n};${fm(a.v)};100`]);
   dl('corredor_especies_UPA01.csv','﻿'+lines.join('\r\n'),'text/csv;charset=utf-8'); };
 $('tsave').onclick=()=>{
