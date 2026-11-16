@@ -862,7 +862,7 @@ td input[type=checkbox]{margin:0 6px 0 0;accent-color:var(--accent);vertical-ali
     <select class="inp" id="cscope" aria-label="Escopo do corredor" style="margin-top:0"></select>
     <div class="stats" id="cstats" style="margin-top:10px"></div>
     <div class="tw" style="max-height:320px;overflow:auto;margin-top:10px"><table id="ctbl"><thead><tr><th>Espécie</th><th>Árv.</th><th>m³</th><th>%</th></tr></thead><tbody></tbody></table></div>
-    <div class="brow"><button type="button" class="btn pri" id="ccsv">Baixar CSV (todas as árvores)</button><button type="button" class="btn" id="ccsvs">CSV resumo por espécie</button></div>
+    <div class="brow"><button type="button" class="btn pri" id="cxlsx">Baixar Excel (.xlsx)</button><button type="button" class="btn" id="ccsv">Baixar CSV (todas as árvores)</button><button type="button" class="btn" id="ccsvs">CSV resumo por espécie</button></div>
     <div class="src" id="ccsvn" style="margin-top:4px"></div>
   </section>
   <section hidden>
@@ -1170,13 +1170,61 @@ $('tnone').onclick=()=>{TR.spl.forEach(x=>tsel[x[0]]=0);treesSp();spChanged();};
 $('ttop').onclick=()=>{TR.spl.forEach((x,i)=>tsel[x[0]]=i<10?1:0);treesSp();spChanged();};
 $('cscope').onchange=e=>{tst.scope=e.target.value;corUI();};
 function dl(name,text,mime){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:mime})); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500); }
-/* CSV com todas as árvores do corredor (a ≤R m da estrada mais próxima; respeita espécies, DAP/CAP, escopo e chave do buffer) */
-$('ccsv').onclick=()=>{
+/* seleção de árvores do corredor (mesma regra do painel): dona = estrada mais próxima, ≤R m, escopo, espécies, DAP/CAP */
+function corSel(){
   const O=owners(true), set=tst.scope==='all'?null:new Set([tst.scope]), rows=[];
   for(let i=0;i<TN;i++){ const k=O.own[i]; if(k<0) continue; const src=O.srcs[k]; if(set&&!set.has(src.id)) continue; const r=TR.t[i]; if(!tok(r)) continue;
     const ln=src.id==='prev'?{id:'(em desenho)',tipo:''}:dr.lines[+src.id]; rows.push({ln,r,d:src.d[i]}); }
-  if(!rows.length){ $('ccsvn').textContent='Nenhuma árvore no corredor para exportar (desenhe uma estrada ativa e confira os filtros).'; return; }
   rows.sort((a,b)=>(a.ln.id<b.ln.id?-1:a.ln.id>b.ln.id?1:0)||TR.sp[a.r[2]].localeCompare(TR.sp[b.r[2]],'pt-BR')||b.r[3]-a.r[3]);
+  return rows;
+}
+/* ===== XLSX sem bibliotecas (zip "store" + OOXML) ===== */
+const CRCT=(()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; t[n]=c>>>0; } return t; })();
+const crc32=u=>{ let c=0xFFFFFFFF; for(let i=0;i<u.length;i++) c=CRCT[(c^u[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; };
+function zipStore(files){ const enc=new TextEncoder(), parts=[], cen=[]; let off=0;
+  const w16=(v,x)=>v.push(x&255,(x>>8)&255), w32=(v,x)=>v.push(x&255,(x>>>8)&255,(x>>>16)&255,(x>>>24)&255);
+  files.forEach(f=>{ const nm=enc.encode(f.name), data=enc.encode(f.data), crc=crc32(data), h=[];
+    w32(h,0x04034b50); w16(h,20); w16(h,0x0800); w16(h,0); w16(h,0); w16(h,33); w32(h,crc); w32(h,data.length); w32(h,data.length); w16(h,nm.length); w16(h,0);
+    parts.push(new Uint8Array(h),nm,data);
+    const c=[]; w32(c,0x02014b50); w16(c,20); w16(c,20); w16(c,0x0800); w16(c,0); w16(c,0); w16(c,33); w32(c,crc); w32(c,data.length); w32(c,data.length); w16(c,nm.length); w16(c,0); w16(c,0); w16(c,0); w16(c,0); w32(c,0); w32(c,off);
+    cen.push(new Uint8Array(c),nm); off+=h.length+nm.length+data.length; });
+  const cs=cen.reduce((a,x)=>a+x.length,0), e=[]; w32(e,0x06054b50); w16(e,0); w16(e,0); w16(e,files.length); w16(e,files.length); w32(e,cs); w32(e,off); w16(e,0);
+  return new Blob([...parts,...cen,new Uint8Array(e)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); }
+const xe=t=>String(t).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const colL=i=>{ let n=i+1,s=''; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; };
+/* sheet: {name, widths:[], rows:[[{v,s}|v ...]], filter:true, freeze:true} ; s = índice de estilo */
+function sheetXml(sh){ const nR=sh.rows.length, nC=Math.max(...sh.rows.map(r=>r.length));
+  const rowsX=sh.rows.map((row,ri)=>`<row r="${ri+1}">`+row.map((c,ci)=>{ if(c===null||c===undefined||c==='') return ''; const o=(typeof c==='object')?c:{v:c,s:0}, ref=colL(ci)+(ri+1);
+    return typeof o.v==='number'&&isFinite(o.v)?`<c r="${ref}" s="${o.s||0}"><v>${o.v}</v></c>`:`<c r="${ref}" s="${o.s||0}" t="inlineStr"><is><t xml:space="preserve">${xe(o.v)}</t></is></c>`; }).join('')+'</row>').join('');
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"${sh.first?' tabSelected="1"':''}>${sh.freeze?'<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>':''}</sheetView></sheetViews><cols>${sh.widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${rowsX}</sheetData>${sh.filter?`<autoFilter ref="A1:${colL(nC-1)}${nR}"/>`:''}</worksheet>`; }
+function xlsxBlob(sheets){ sheets[0].first=true; const NS='http://schemas.openxmlformats.org/spreadsheetml/2006/main', RN='http://schemas.openxmlformats.org/officeDocument/2006/relationships', P='http://schemas.openxmlformats.org/package/2006/relationships';
+  const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${NS}"><numFmts count="3"><numFmt numFmtId="164" formatCode="0.0"/><numFmt numFmtId="165" formatCode="0.000"/><numFmt numFmtId="166" formatCode="0.000000"/></numFmts><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2D6A4F"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="9"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="1" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="165" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  const files=[{name:'[Content_Types].xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`},
+   {name:'_rels/.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${P}"><Relationship Id="rId1" Type="${RN}/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
+   {name:'xl/workbook.xml',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="${NS}" xmlns:r="${RN}"><sheets>${sheets.map((x,i)=>`<sheet name="${xe(x.name)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')}</sheets></workbook>`},
+   {name:'xl/_rels/workbook.xml.rels',data:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${P}">${sheets.map((_,i)=>`<Relationship Id="rId${i+1}" Type="${RN}/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length+1}" Type="${RN}/styles" Target="styles.xml"/></Relationships>`},
+   {name:'xl/styles.xml',data:styles}].concat(sheets.map((x,i)=>({name:`xl/worksheets/sheet${i+1}.xml`,data:sheetXml(x)})));
+  return zipStore(files); }
+$('cxlsx').onclick=()=>{
+  const rows=corSel(); if(!rows.length){ $('ccsvn').textContent='Nenhuma árvore no corredor para exportar (desenhe uma estrada ativa e confira os filtros).'; return; }
+  const H=s=>({v:s,s:1}), N=(v,s)=>({v,s}), r1=x=>Math.round(x*10)/10;
+  const head=['Estrada','Tipo','UT','Faixa','Nº árvore','Espécie','DAP (cm)','CAP (cm)','Altura comercial (m)','Volume (m³)','Distância à estrada (m)','Longitude','Latitude'].map(H);
+  const data=rows.map(({ln,r,d})=>{ const ut=(D.uts.find(u=>parseInt(u.ut,10)===r[6])||{ut:r[6]}).ut;
+    return [ln.id,ln.tipo,String(ut),N(r[7]||null,4),N(r[8]||null,4),TR.sp[r[2]],N(r1(r[4]),2),N(Math.round(r[4]*Math.PI),4),N(r1(r[5]),2),N(Math.round(r[3]*1000)/1000,3),N(Math.round(d),4),N(r[0],5),N(r[1],5)]; });
+  // resumo por espécie e por estrada (a partir da própria lista)
+  const agg=(keyf)=>{ const m=new Map(); rows.forEach(x=>{ const k=keyf(x); const a=m.get(k)||{n:0,v:0}; a.n++; a.v+=x.r[3]; m.set(k,a); }); return [...m].sort((a,b)=>b[1].v-a[1].v); };
+  const V=rows.reduce((a,x)=>a+x.r[3],0), spA=agg(x=>TR.sp[x.r[2]]), roA=agg(x=>x.ln.id);
+  const resumo=[[H('Espécie'),H('Árvores'),H('Volume (m³)'),H('% do volume'),H('Volume médio (m³/árv.)')]].concat(spA.map(([k,a])=>[k,N(a.n,4),N(Math.round(a.v*1000)/1000,3),N(Math.round(a.v/V*1000)/10,2),N(Math.round(a.v/a.n*1000)/1000,3)]),[[N('Total',6),N(rows.length,6),N(Math.round(V*1000)/1000,7),N(100,6),N(Math.round(V/rows.length*1000)/1000,7)]],[[]],[[H('Estrada'),H('Árvores'),H('Volume (m³)'),H('% do volume')]],roA.map(([k,a])=>[k,N(a.n,4),N(Math.round(a.v*1000)/1000,3),N(Math.round(a.v/V*1000)/10,2)]));
+  const sc=tst.scope==='all'?'Todas as linhas ativas (sem sobreposição)':$('cscope').selectedOptions[0].textContent, dl_=dapList();
+  const par=[[H('Parâmetro'),H('Valor')],['Mapa','UPA 01 · UMF I · FLONA Jatuarana'],['Gerado em',new Date().toLocaleString('pt-BR')],['Escopo',sc],['Distância de cada lado (m)',N(tst.R,0)],['Árvores exportadas',N(rows.length,4)],['Volume exportado (m³)',N(Math.round(V*1000)/1000,3)],['Espécies marcadas',N(TR.spl.filter(x=>tsel[x[0]]).length,4)],['Só buffer das estradas ativas',tst.only?'sim':'não'],['Filtro de DAP/CAP por espécie',dl_.length?'':'nenhum']]
+    .concat(dl_.map(x=>['   '+x.nome,`DAP ${x.lo}–${x.hi} cm (CAP ${Math.round(x.lo*Math.PI)}–${Math.round(x.hi*Math.PI)} cm)`]));
+  const blob=xlsxBlob([{name:'Árvores',widths:[12,10,6,7,10,22,9,9,12,11,13,12,12],rows:[head].concat(data),filter:true,freeze:true},{name:'Resumo',widths:[26,10,13,12,18],rows:resumo,freeze:false},{name:'Parâmetros',widths:[34,60],rows:par,freeze:false}]);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='arvores_corredor_UPA01.xlsx'; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},800);
+  $('ccsvn').textContent=`Excel gerado: ${f0(rows.length)} árvores · ${f0(V)} m³ (abas Árvores, Resumo e Parâmetros).`; };
+/* CSV com todas as árvores do corredor (a ≤R m da estrada mais próxima; respeita espécies, DAP/CAP, escopo e chave do buffer) */
+$('ccsv').onclick=()=>{
+  const rows=corSel();
+  if(!rows.length){ $('ccsvn').textContent='Nenhuma árvore no corredor para exportar (desenhe uma estrada ativa e confira os filtros).'; return; }
   const fm=(n,d)=>(Math.round(n*Math.pow(10,d))/Math.pow(10,d)).toFixed(d).replace('.',','), q=v=>/[;"\n]/.test(String(v))?'"'+String(v).replace(/"/g,'""')+'"':v;
   const head=['Estrada','Tipo','UT','Faixa','Nº árvore','Espécie','DAP (cm)','CAP (cm)','Altura comercial (m)','Volume (m³)','Distância à estrada (m)','Longitude','Latitude'];
   const out=[head.join(';')].concat(rows.map(({ln,r,d})=>{ const ut=(D.uts.find(u=>parseInt(u.ut,10)===r[6])||{ut:r[6]}).ut;
