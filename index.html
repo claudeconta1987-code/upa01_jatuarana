@@ -745,6 +745,12 @@ td.hi{color:#d6453d;font-weight:600}
 #dtbl th:first-child,#dtbl td:first-child{text-align:left}
 #dtbl td{padding:3px 4px;text-align:right;border-bottom:1px solid var(--line);cursor:pointer}
 #dtbl tr.tot td{font-weight:600;cursor:default}
+.sr{display:flex;align-items:center;gap:6px}
+.sr .chk{flex:1;min-width:0}
+.sr .chk>span:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cap{width:58px;flex:none;font:inherit;font-size:12px;text-align:right;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:5px;padding:2px 4px;font-variant-numeric:tabular-nums}
+.cap.on{border-color:var(--accent);font-weight:600}
+.caph{display:flex;justify-content:flex-end;font-size:10.5px;color:var(--muted);padding:4px 0 0}
 .spl{max-height:250px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:8px;padding:2px 8px}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;border:1.5px solid #123;vertical-align:-1px;margin-right:6px}
 tbody tr.off{opacity:.45} tbody tr.off td:first-child{text-decoration:line-through}
@@ -800,6 +806,7 @@ td input[type=checkbox]{margin:0 6px 0 0;accent-color:var(--accent);vertical-ali
     <div class="stats" id="tstats" style="margin-top:10px"></div>
     <input class="inp" type="search" id="tq" placeholder="Buscar espécie…" aria-label="Buscar espécie">
     <div class="brow"><button type="button" class="btn sm" id="tall">Todas</button><button type="button" class="btn sm" id="tnone">Nenhuma</button><button type="button" class="btn sm" id="ttop">10 maiores em volume</button></div>
+    <div class="caph">CAP mín. de exploração (cm) →</div>
     <div class="spl" id="tsp"></div>
     <div id="dapsec">
       <h3>Filtro de DAP por espécie</h3>
@@ -807,8 +814,8 @@ td input[type=checkbox]{margin:0 6px 0 0;accent-color:var(--accent);vertical-ali
       <div class="dhist" id="dhist" title="Volume por classe de DAP (clique numa barra para usar só essa classe)"></div>
       <div class="dax"><span id="dax0"></span><span>DAP (cm) · altura da barra = volume</span><span id="dax1"></span></div>
       <div class="dsl">
-        <label>DAP mín: <b id="dminv">–</b> cm<input class="rng" type="range" id="dmin"></label>
-        <label>DAP máx: <b id="dmaxv">–</b> cm<input class="rng" type="range" id="dmax"></label>
+        <label>DAP mín: <b id="dminv">–</b><input class="rng" type="range" id="dmin"></label>
+        <label>DAP máx: <b id="dmaxv">–</b><input class="rng" type="range" id="dmax"></label>
       </div>
       <div class="src" id="dinfo" style="margin-top:6px"></div>
       <div class="brow"><button type="button" class="btn sm" id="dapall">Aplicar faixa a todas</button><button type="button" class="btn sm" id="dapres">Limpar esta</button><button type="button" class="btn sm" id="dapresall">Limpar todas</button></div>
@@ -1144,7 +1151,7 @@ function corUI(){
 function treesSp(){
   spAgg();
   const q=tst.q.trim().toLowerCase(), nrm=s=>s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
-  $('tsp').innerHTML=TR.spl.filter(x=>!q||nrm(TR.sp[x[0]]).includes(nrm(q))).map(x=>`<label class="chk"><input type="checkbox" data-sp="${x[0]}" ${tsel[x[0]]?'checked':''}><span><i class="dot" style="background:${SPC[x[0]]}"></i>${esc(TR.sp[x[0]])}</span><span class="n"${FN[x[0]]!==x[1]?' title="filtrado por DAP · total: '+f0(x[1])+' árv. / '+f0(x[2])+' m³" style="color:var(--accent);font-weight:600"':''}>${f0(FN[x[0]])} · ${f0(FV[x[0]])} m³</span></label>`).join('')||'<p class="src" style="padding:8px 0">Nenhuma espécie encontrada.</p>';
+  $('tsp').innerHTML=TR.spl.filter(x=>!q||nrm(TR.sp[x[0]]).includes(nrm(q))).map(x=>`<div class="sr"><label class="chk"><input type="checkbox" data-sp="${x[0]}" ${tsel[x[0]]?'checked':''}><span><i class="dot" style="background:${SPC[x[0]]}"></i>${esc(TR.sp[x[0]])}</span><span class="n"${FN[x[0]]!==x[1]?' title="filtrado por DAP · total: '+f0(x[1])+' árv. / '+f0(x[2])+' m³" style="color:var(--accent);font-weight:600"':''}>${f0(FN[x[0]])} · ${f0(FV[x[0]])} m³</span></label><input class="cap${tmin[x[0]]>0?' on':''}" type="number" min="0" step="1" inputmode="numeric" data-cap="${x[0]}" value="${tmin[x[0]]>0?Math.round(tmin[x[0]]*Math.PI):''}" placeholder="CAP" title="CAP mínimo de exploração (cm) · DAP = CAP ÷ π${tmin[x[0]]>0?' = '+f1(tmin[x[0]])+' cm':''}" aria-label="CAP mínimo de exploração de ${esc(TR.sp[x[0]])}"></div>`).join('')||'<p class="src" style="padding:8px 0">Nenhuma espécie encontrada.</p>';
 }
 const spChanged=()=>{ dapUI(); treesStats(); treesDraw(); if(typeof dr!=='undefined') dRedraw(true); corUI(); };
 $('tmode').onclick=e=>{const b=e.target.closest('button');if(!b)return;tst.mode=b.dataset.m;[...$('tmode').children].forEach(x=>x.setAttribute('aria-pressed',x===b));treesLeg();treesDraw();};
@@ -1152,6 +1159,7 @@ $('ton').onchange=e=>{tst.on=e.target.checked;treesDraw();};
 $('rr').oninput=e=>{tst.R=+e.target.value;$('rval').textContent=tst.R; TG=null; if(typeof dr!=='undefined'){ dRedraw(); corPreview(); } else treesRecalc(); };
 $('tq').oninput=e=>{tst.q=e.target.value;treesSp();};
 $('tsp').onchange=e=>{const t=e.target; if(t.dataset.sp===undefined) return; tsel[+t.dataset.sp]=t.checked?1:0; spChanged();};
+$('tsp').addEventListener('change',e=>{ const t=e.target; if(t.dataset.cap===undefined) return; const k=+t.dataset.cap, c=parseFloat(String(t.value).replace(',','.')); tmin[k]=(isFinite(c)&&c>0)?c/Math.PI:0; dapSave(); treesSp(); spChanged(); });
 $('tall').onclick=()=>{TR.spl.forEach(x=>tsel[x[0]]=1);treesSp();spChanged();};
 $('tnone').onclick=()=>{TR.spl.forEach(x=>tsel[x[0]]=0);treesSp();spChanged();};
 $('ttop').onclick=()=>{TR.spl.forEach((x,i)=>tsel[x[0]]=i<10?1:0);treesSp();spChanged();};
@@ -1162,7 +1170,7 @@ $('ccsv').onclick=()=>{ const a=corAgg(owners(true),tst.scope==='all'?null:[tst.
   dl('corredor_especies_UPA01.csv','﻿'+lines.join('\r\n'),'text/csv;charset=utf-8'); };
 $('tsave').onclick=()=>{
   const R=tst.R; let n=0,v=0,nc=0,vc=0; TR.t.forEach((r,i)=>{ if(!tok(r)) return; n++; v+=r[3]; if(TD[i]<=R){nc++;vc+=r[3];} });
-  const o={filtro_dap_cm:dapList().map(x=>({especie:x.nome,dap_min:x.lo,dap_max:x.hi})),distancia_cada_lado_m:R,especies:TR.spl.filter(x=>tsel[x[0]]).map(x=>TR.sp[x[0]]),arvores:n,volume_m3:Math.round(v*10)/10,cobertura_volume_pct:v?Math.round(vc/v*1000)/10:0,
+  const o={filtro_dap_cm:dapList().map(x=>({especie:x.nome,dap_min:x.lo,dap_max:x.hi,cap_min:Math.round(x.lo*Math.PI),cap_max:Math.round(x.hi*Math.PI)})),distancia_cada_lado_m:R,especies:TR.spl.filter(x=>tsel[x[0]]).map(x=>TR.sp[x[0]]),arvores:n,volume_m3:Math.round(v*10)/10,cobertura_volume_pct:v?Math.round(vc/v*1000)/10:0,
     estradas_desativadas:[...st.off],tracados_desenhados:(typeof dr!=='undefined'?dr.lines.map(x=>({id:x.id,tipo:x.tipo,ativa:!x.off})):[])};
   dl('selecao_especies_UPA01.json',JSON.stringify(o,null,1),'application/json'); };
 map.on('move zoomend resize viewreset',treesDraw);
@@ -1189,7 +1197,7 @@ function dapUI(){
   const k=dap.k, [lo,hi]=spRange(k), a=$('dmin'), b=$('dmax'); $('dsp').value=k;
   a.min=b.min=lo; a.max=b.max=hi; a.step=b.step=5;
   const vmin=tmin[k]>0?Math.max(lo,Math.round(tmin[k])):lo, vmax=tmax[k]<999?Math.min(hi,Math.round(tmax[k])):hi;
-  a.value=vmin; b.value=vmax; $('dminv').textContent=vmin; $('dmaxv').textContent=vmax;
+  a.value=vmin; b.value=vmax; $('dminv').textContent=vmin+' (CAP '+Math.round(vmin*Math.PI)+')'; $('dmaxv').textContent=vmax+' (CAP '+Math.round(vmax*Math.PI)+')';
   // histograma (todas as árvores da espécie; fora da faixa em cinza)
   const w=(hi-lo)<=160?10:20, base=Math.floor(lo/w)*w, nb=Math.max(1,Math.ceil((hi-base)/w)), C=new Float64Array(nb), V=new Float64Array(nb);
   for(const i of TBY[k]){ const r=TR.t[i], c=Math.min(nb-1,Math.floor((r[4]-base)/w)); C[c]++; V[c]+=r[3]; }
