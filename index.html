@@ -727,6 +727,7 @@ td.hi{color:#d6453d;font-weight:600}
 .btn:hover{border-color:var(--accent)} .btn.pri{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-weight:600}
 .btn[disabled]{opacity:.45;cursor:default}
 .brow{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.brow>.btn{flex:1 1 auto}
 .dl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px}
 .dl input[type=text],.dl select{font:inherit;font-size:12.5px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:5px;padding:3px 6px;min-width:0}
 .dl .m{color:var(--muted);font-variant-numeric:tabular-nums;grid-column:1/-1}
@@ -743,14 +744,20 @@ td.hi{color:#d6453d;font-weight:600}
 .dhist i.off{opacity:.28;filter:grayscale(1)}
 .dax{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px}
 .dsl{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;font-size:12.5px}
-#dtbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
-#dtbl th{font-weight:600;color:var(--muted);text-align:right;padding:3px 4px;border-bottom:1px solid var(--line)}
-#dtbl th:first-child,#dtbl td:first-child{text-align:left}
-#dtbl td{padding:3px 4px;text-align:right;border-bottom:1px solid var(--line);cursor:pointer}
-#dtbl tr.tot td{font-weight:600;cursor:default}
+#dtbl{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px;margin-top:10px;table-layout:auto;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+#dtbl th{font-weight:600;font-size:11px;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);text-align:right;padding:7px 6px;background:var(--bg2,rgba(127,127,127,.08));border-bottom:1px solid var(--line);white-space:normal;line-height:1.15}
+#dtbl th:first-child,#dtbl td:first-child{text-align:left;white-space:normal;min-width:0;padding-left:8px;line-height:1.2}
+#dtbl td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line);cursor:pointer;vertical-align:middle;line-height:1.15}
+#dtbl td b{display:block;font-weight:650}
+#dtbl td small{display:block;font-size:10.5px;color:var(--muted);font-weight:400}
+#dtbl tbody tr:last-child td{border-bottom:0}
+#dtbl tr:hover td{background:rgba(127,127,127,.07)}
+#dtbl tr.tot td{font-weight:600;cursor:default;background:rgba(46,125,85,.08)}
+#dtbl .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:baseline}
 .sr{display:flex;align-items:center;gap:6px}
 .sr .chk{flex:1;min-width:0}
-.sr .chk>span:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sr .chk>span:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1 1 0;min-width:0}
+.sr .chk .n{flex:none;white-space:nowrap;font-size:11.5px;margin-left:4px}
 .cap{width:46px;flex:none;font:inherit;font-size:12px;text-align:right;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:5px;padding:2px 4px;font-variant-numeric:tabular-nums}
 .cap.on{border-color:var(--accent);font-weight:600}
 .caph{display:flex;justify-content:flex-end;font-size:10.5px;color:var(--muted);padding:4px 0 0}
@@ -889,7 +896,7 @@ h1{font-size:23px;font-weight:700;letter-spacing:-.02em}
       <div class="dax"><span id="dax0"></span><span>CAP (cm) · altura da barra = volume</span><span id="dax1"></span></div>
       <div class="src" id="dinfo" style="margin-top:6px"></div>
       <div class="brow"><button type="button" class="btn sm" id="dapall">Aplicar faixa a todas</button><button type="button" class="btn sm" id="dapres">Limpar esta</button><button type="button" class="btn sm" id="dapresall">Limpar todas</button></div>
-      <table id="dtbl" hidden><thead><tr><th>Espécie com filtro</th><th>CAP (cm)</th><th>Árv.</th><th>m³</th></tr></thead><tbody></tbody></table>
+      <table id="dtbl" hidden><thead><tr><th>Espécie</th><th>CAP cm</th><th>Árvores</th><th>m³</th></tr></thead><tbody></tbody></table>
     </div>
     <div class="brow"><button type="button" class="btn" id="tsave">Baixar seleção (JSON)</button></div>
   </section>
@@ -1361,8 +1368,9 @@ function dapUI(){
   $('dinfo').innerHTML=dapOn(k)?`<b>${f0(FN[k])}</b> de ${f0(tot[1])} árvores · <b>${f0(FV[k])}</b> de ${f0(tot[2])} m³ (${f1(FV[k]/tot[2]*100)}%) com CAP ${L0.clo}–${L0.chi} cm`:`Sem filtro: todas as ${f0(tot[1])} árvores (${f0(tot[2])} m³), CAP ${Math.round(clo)}–${Math.round(chi)} cm.`;
   const L=dapList(), T=$('dtbl'); T.hidden=!L.length;
   let sn=0,sv=0,tn=0,tv=0;
-  setH(T.tBodies[0],L.map(x=>{ const t=TR.spl.find(y=>y[0]===x.k); sn+=FN[x.k]; sv+=FV[x.k]; tn+=t[1]; tv+=t[2]; return `<tr data-k="${x.k}"><td><i class="dot" style="background:${SPC[x.k]}"></i>${esc(x.nome)}</td><td>${x.clo}–${x.chi}</td><td>${f0(FN[x.k])}/${f0(t[1])}</td><td>${f0(FV[x.k])}/${f0(t[2])}</td></tr>`; }).join('')+(L.length>1?`<tr class="tot"><td>Soma (espécies filtradas)</td><td></td><td>${f0(sn)}/${f0(tn)}</td><td>${f0(sv)}/${f0(tv)}</td></tr>`:''));
+  setH(T.tBodies[0],L.map(x=>{ const t=TR.spl.find(y=>y[0]===x.k); sn+=FN[x.k]; sv+=FV[x.k]; tn+=t[1]; tv+=t[2]; return `<tr data-k="${x.k}"><td><i class="dot" style="background:${SPC[x.k]}"></i>${esc(x.nome)}</td><td>${x.clo}–${x.chi}</td><td>${pr(FN[x.k],t[1])}</td><td>${pr(FV[x.k],t[2])}</td></tr>`; }).join('')+(L.length>1?`<tr class="tot"><td>Soma das filtradas</td><td></td><td>${pr(sn,tn)}</td><td>${pr(sv,tv)}</td></tr>`:''));
 }
+function pr(a,b){ return `<b>${f0(a)}</b><small>de ${f0(b)}</small>`; }
 function dapApply(){ dapSave(); spRefresh(); spChanged(); }
 $('dsp').onchange=e=>{ dap.k=+e.target.value; dapUI(); };
 $('dhist').onclick=e=>{ const el=e.target.closest('i'); if(!el) return; const H=$('dhist'), lo=+H.dataset.lo, w=+H.dataset.w, c=+el.dataset.c, k=dap.k;
