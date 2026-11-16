@@ -1,10 +1,10 @@
 {
- "updated": "2026-11-16T17:30:37.870Z",
+ "updated": "2026-11-16T19:34:26.218Z",
  "n": 15,
  "lines": [
   {
    "id": "T01",
-   "tipo": "Tronco",
+   "tipo": "Principal",
    "pts": [
     [
      -59.719347,
@@ -94,7 +94,7 @@
   },
   {
    "id": "T02",
-   "tipo": "Costela",
+   "tipo": "Secundária",
    "pts": [
     [
      -59.717817,
@@ -116,7 +116,7 @@
   },
   {
    "id": "T04",
-   "tipo": "Costela",
+   "tipo": "Secundária",
    "pts": [
     [
      -59.70491,
@@ -154,7 +154,7 @@
   },
   {
    "id": "T06",
-   "tipo": "Costela",
+   "tipo": "Secundária",
    "pts": [
     [
      -59.714642,
@@ -212,7 +212,7 @@
   },
   {
    "id": "T07",
-   "tipo": "Costela",
+   "tipo": "Secundária",
    "pts": [
     [
      -59.686096,
@@ -250,7 +250,7 @@
   },
   {
    "id": "T08",
-   "tipo": "Costela",
+   "tipo": "Secundária",
    "pts": [
     [
      -59.691679,
@@ -268,7 +268,7 @@
   },
   {
    "id": "T09",
-   "tipo": "Costela",
+   "tipo": "Secundária",
    "pts": [
     [
      -59.700651,
@@ -290,7 +290,7 @@
   },
   {
    "id": "T10",
-   "tipo": "Costela",
+   "tipo": "Secundária",
    "pts": [
     [
      -59.677417,
@@ -336,7 +336,7 @@
   },
   {
    "id": "T11",
-   "tipo": "Costela",
+   "tipo": "Secundária",
    "pts": [
     [
      -59.701633,
@@ -374,7 +374,7 @@
   },
   {
    "id": "T12",
-   "tipo": "Outro",
+   "tipo": "Terciária",
    "pts": [
     [
      -59.695415,
@@ -400,7 +400,7 @@
   },
   {
    "id": "T13",
-   "tipo": "Costela",
+   "tipo": "Secundária",
    "pts": [
     [
      -59.691296,
@@ -430,7 +430,7 @@
   },
   {
    "id": "T14",
-   "tipo": "Costela",
+   "tipo": "Secundária",
    "pts": [
     [
      -59.701511,
