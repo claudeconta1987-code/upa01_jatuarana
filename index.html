@@ -736,6 +736,16 @@ td.hi{color:#d6453d;font-weight:600}
 .drawing .leaflet-interactive{cursor:crosshair}
 .dlive{font-size:12.5px;color:var(--muted);margin-top:8px;min-height:18px;font-variant-numeric:tabular-nums}
 .inp{width:100%;font:inherit;font-size:12.5px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin-top:8px}
+.nf{margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--bg)}
+.nf summary{cursor:pointer;font:600 12.5px/1.3 var(--font-body);color:var(--fg)}
+.nf summary .n{font-weight:400;color:var(--accent)}
+.nl{max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:4px 6px;margin-top:6px;background:#fff}
+.nl .chk{display:flex;align-items:center;gap:6px;padding:2px 0;font-size:12.5px}
+.nl .chk>span:nth-child(2){flex:1}
+.nl .n{color:var(--muted);font-size:11.5px;white-space:nowrap}
+.clsleg{display:flex;gap:14px;flex-wrap:wrap;margin:2px 0 6px;font-size:12.5px;align-items:center}
+.clsleg i{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:-1px;margin-right:5px}
+
 .rng{width:100%;accent-color:var(--accent);margin:4px 0 0}
 #dapsec{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
 #dapsec h3{font:600 11px/1 var(--font-body);text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:0 0 6px}
@@ -889,17 +899,21 @@ h1{font-size:23px;font-weight:700;letter-spacing:-.02em}
   </section>
   <section id="treesec">
     <h2>Árvores <span id="tcnt" style="font-weight:400;text-transform:none;letter-spacing:0"></span></h2>
-    <label class="chk"><input type="checkbox" id="ton" checked><span>Mostrar árvores</span></label>
+    <label class="chk"><input type="checkbox" id="ton" checked><span><b>Mostrar Corte</b> (ponto cheio) <span class="n" id="cn"></span></span></label>
     <label class="chk"><input type="checkbox" id="tonly"><span><b>Só árvores dentro do buffer</b> das estradas ativas</span></label>
     <label class="chk"><input type="checkbox" id="tr2" checked><span><b>Mostrar Remanescente 2</b> (anel vazado) <span class="n" id="r2n"></span></span></label>
     <div class="src" id="r2stat" style="margin:0 0 6px"></div>
-    <h3 style="margin:12px 0 0;font:600 11px/1 var(--font-body);text-transform:uppercase;letter-spacing:.09em;color:var(--muted)">Filtrar por nome</h3>
-    <input class="inp" type="search" id="fnc" list="dlnc" placeholder="Nome comercial (ex.: copaibão)…" aria-label="Filtrar por nome comercial" autocomplete="off">
-    <datalist id="dlnc"></datalist>
-    <input class="inp" type="search" id="fnv" list="dlnv" placeholder="Nome vulgar (ex.: jutaí)…" aria-label="Filtrar por nome vulgar" autocomplete="off">
-    <datalist id="dlnv"></datalist>
+    <h3 style="margin:12px 0 0;font:600 11px/1 var(--font-body);text-transform:uppercase;letter-spacing:.09em;color:var(--muted)">Filtrar por nome <span style="font-weight:400;text-transform:none;letter-spacing:0">(marque um ou mais)</span></h3>
+    <details class="nf" id="dnc"><summary>Nome comercial <span class="n" id="ncs"></span></summary>
+      <input class="inp" type="search" id="fnc" placeholder="Buscar na lista…" aria-label="Buscar nome comercial" autocomplete="off">
+      <div class="brow"><button type="button" class="btn sm" id="fnc_vis">Marcar listados</button><button type="button" class="btn sm" id="fnc_clr">Limpar</button></div>
+      <div class="nl" id="lnc"></div><div class="src" style="margin-top:4px">corte · rem. 2 (nº de árvores)</div></details>
+    <details class="nf" id="dnv"><summary>Nome vulgar <span class="n" id="nvs"></span></summary>
+      <input class="inp" type="search" id="fnv" placeholder="Buscar na lista…" aria-label="Buscar nome vulgar" autocomplete="off">
+      <div class="brow"><button type="button" class="btn sm" id="fnv_vis">Marcar listados</button><button type="button" class="btn sm" id="fnv_clr">Limpar</button></div>
+      <div class="nl" id="lnv"></div><div class="src" style="margin-top:4px">corte · rem. 2 (nº de árvores)</div></details>
     <div class="src" id="fninfo" style="margin:4px 0 0"></div>
-    <div class="seg" id="tmode" style="margin-top:8px"><button type="button" data-m="sp" aria-pressed="true">Cor por espécie</button><button type="button" data-m="cov" aria-pressed="false">Cor por alcance</button></div>
+    <div class="seg" id="tmode" style="margin-top:8px"><button type="button" data-m="sp" aria-pressed="true">Cor por espécie</button><button type="button" data-m="cov" aria-pressed="false">Cor por alcance</button><button type="button" data-m="cls" aria-pressed="false">Cor por classe</button></div>
     <div class="leg" id="tleg" style="margin-top:6px"></div>
     <label style="display:block;margin-top:10px;font-size:13px">Distância de cada lado da estrada: <b id="rval">300</b> m
       <input class="rng" type="range" id="rr" min="50" max="500" step="25" value="300"></label>
@@ -1183,20 +1197,21 @@ function treesDraw(){
   if(tcv.width!==sz.x*dpr||tcv.height!==sz.y*dpr){ tcv.width=sz.x*dpr; tcv.height=sz.y*dpr; tcv.style.width=sz.x+'px'; tcv.style.height=sz.y+'px'; }
   L.DomUtil.setPosition(tcv,map.containerPointToLayerPoint([0,0]));
   const g=tcv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,sz.x,sz.y);
-  if(!tst.on) return;
   const z=map.getZoom(), RZ=[[12,1.3],[13,1.6],[14,2.6],[15,4],[16,5.2],[17,6.5]]; let rad=RZ[RZ.length-1][1]; if(z<=RZ[0][0]) rad=RZ[0][1]; else for(let k=1;k<RZ.length;k++) if(z<=RZ[k][0]){ const a=RZ[k-1],b=RZ[k]; rad=a[1]+(b[1]-a[1])*(z-a[0])/(b[0]-a[0]); break; } const R=tst.R;
   const stroke=z>=14.5; g.lineWidth=stroke?1:0; g.strokeStyle='rgba(10,20,15,.85)';
   const batch=(idxs,color,alpha,cov,ring)=>{ g.globalAlpha=alpha; const rr=ring?rad*1.25:rad; g.fillStyle=color; g.beginPath(); let any=false;
     for(let q=0;q<idxs.length;q++){ const i=idxs[q]; if((TD[i]<=R)!==cov) continue; const r=TR.t[i]; if(!okC[r[2]]||!okV[r[11]]||r[4]<tmin[r[2]]||r[4]>tmax[r[2]]) continue; if(tst.only&&TD[i]>R) continue;
       const p=map.latLngToContainerPoint([r[1],r[0]]); if(p.x<-8||p.y<-8||p.x>sz.x+8||p.y>sz.y+8) continue; g.moveTo(p.x+rr,p.y); g.arc(p.x,p.y,rr,0,6.2832); any=true; }
     if(any){ g.fill(); if(ring){ if(stroke){ g.lineWidth=1.3; g.strokeStyle='#fff'; g.stroke(); } g.lineWidth=stroke?1:0; g.strokeStyle='rgba(10,20,15,.85)'; } else if(stroke) g.stroke(); } };
-  if(tst.mode==='cov'){ const all=[]; for(let k=0;k<TBY.length;k++) if(tsel[k]) for(const i of TBY[k]) all.push(i); batch(all,'#ffe600',1,false); batch(all,'#00c26e',1,true); }
+  if(!tst.on){}
+  else if(tst.mode==='cls'){ const all=[]; for(let k=0;k<TBY.length;k++) if(tsel[k]) for(const i of TBY[k]) all.push(i); batch(all,'#1b9e5a',1,false); batch(all,'#1b9e5a',1,true); }
+  else if(tst.mode==='cov'){ const all=[]; for(let k=0;k<TBY.length;k++) if(tsel[k]) for(const i of TBY[k]) all.push(i); batch(all,'#ffe600',1,false); batch(all,'#00c26e',1,true); }
   else { /* todas opacas; as dentro do corredor ganham anel branco e ficam um pouco maiores */
     for(const x of TR.spl){ const k=x[0]; if(!tsel[k]) continue; batch(TBY[k],SPC[k],1,false); if(tst.anySrc) batch(TBY[k],SPC[k],1,true,true); } }
   if(tst.r2&&R2.length){ const rr=rad*1.2; g.lineWidth=z>=14.5?1.8:1.3;
     for(let i=0;i<R2.length;i++){ const r=R2[i]; if(!okC[r[2]]||!okV[r[9]]) continue;
       const p=map.latLngToContainerPoint([r[1],r[0]]); if(p.x<-8||p.y<-8||p.x>sz.x+8||p.y>sz.y+8) continue;
-      g.beginPath(); g.arc(p.x,p.y,rr,0,6.2832); g.globalAlpha=.5; g.fillStyle='#ffffff'; g.fill(); g.globalAlpha=1; g.strokeStyle=SPC2[r[2]]; g.stroke(); } }
+      g.beginPath(); g.arc(p.x,p.y,rr,0,6.2832); g.globalAlpha=1; g.strokeStyle=tst.mode==='cls'?'#ff7a00':SPC2[r[2]]; g.stroke(); } }
   g.globalAlpha=1;
 }
 function bufUpdate(){
@@ -1219,7 +1234,7 @@ function treesLeg(){
   const onlyMsg=tst.only?`<div class="src" style="margin:0 0 6px;color:var(--accent);font-weight:600">Mostrando só as árvores a ≤${tst.R} m de estrada ativa${tst.anySrc?'':' — nenhuma estrada desenhada ativa (vale só o acesso GPS, se visível)'}.</div>`:'';
   $('tleg').innerHTML=onlyMsg+(tst.mode==='cov'
    ?`<div class="lg" style="grid-template-columns:22px 1fr"><span><i class="dot" style="background:#00c26e"></i></span><span>a até ${tst.R} m de uma estrada ativa</span></div><div class="lg" style="grid-template-columns:22px 1fr"><span><i class="dot" style="background:#ffe600"></i></span><span>fora do alcance das estradas ativas</span></div>`
-   :`<div class="lg" style="grid-template-columns:1fr"><span class="src">Cada cor é uma espécie (veja a lista abaixo).${tst.anySrc?' Árvores maiores (com anel branco no zoom aproximado) estão dentro do corredor das estradas ativas.':''}</span></div>`);
+   :tst.mode==='cls'?`<div class="clsleg"><span><i style="background:#1b9e5a"></i>Corte (ponto cheio)</span><span><i style="background:#fff;border:2px solid #ff7a00"></i>Remanescente 2 (anel)</span></div>`:`<div class="clsleg"><span><i style="background:#999"></i>Corte: ponto cheio</span><span><i style="background:#fff;border:2px solid #999"></i>Remanescente 2: anel vazado</span></div><div class="lg" style="grid-template-columns:1fr"><span class="src">Cada cor é uma espécie (veja a lista abaixo).${tst.anySrc?' Árvores maiores (com anel branco no zoom aproximado) estão dentro do corredor das estradas ativas.':''}</span></div>`);
 }
 function treesStats(){
   let n=0,v=0,nc=0,vc=0; const R=tst.R;
@@ -1275,22 +1290,33 @@ function spRefresh(){ /* atualiza a lista sem recriá-la (não tira o foco dos c
 const spChanged=()=>{ dapUI(); treesStats(); treesDraw(); if(typeof dr!=='undefined') dRedraw(true); corUI(); };
 $('tmode').onclick=e=>{const b=e.target.closest('button');if(!b)return;tst.mode=b.dataset.m;[...$('tmode').children].forEach(x=>x.setAttribute('aria-pressed',x===b));treesLeg();treesDraw();};
 $('tonly').onchange=e=>{ tst.only=e.target.checked; treesSp(); spChanged(); treesLeg(); };
-$('ton').onchange=e=>{tst.on=e.target.checked;treesDraw();};
+$('ton').onchange=e=>{tst.on=e.target.checked;r2UI();treesDraw();};
 $('rr').oninput=e=>{tst.R=+e.target.value;$('rval').textContent=tst.R; TG=null; if(typeof dr!=='undefined'){ dRedraw(); corPreview(); } else treesRecalc(); };
 $('tq').oninput=e=>{tst.q=e.target.value;treesSp();};
-function r2UI(){ let n=0,v=0; if(tst.r2) for(let i=0;i<R2.length;i++){ const r=R2[i]; if(!okC[r[2]]||!okV[r[9]]) continue; n++; v+=r[3]; }
-  $('r2n').textContent=tst.r2?f0(n)+' de '+f0(R2.length):f0(R2.length);
-  $('r2stat').textContent=tst.r2?`${f0(n)} árvores · ${f0(v)} m³ em exibição. Só visualização: não entram nas somas, no corredor nem nas exportações.`:''; }
-function nameInit(){ const sc=new Set(R2.map(r=>r[2])); TR.spl.forEach(x=>sc.add(x[0]));
-  $('dlnc').innerHTML=[...sc].map(k=>TR.sp[k]).sort((a,b)=>a.localeCompare(b,'pt-BR')).map(n=>`<option value="${esc(n)}">`).join('');
-  $('dlnv').innerHTML=[...VN].sort((a,b)=>a.localeCompare(b,'pt-BR')).map(n=>`<option value="${esc(n)}">`).join(''); r2UI(); }
-function nameFilter(){ const a=nrmS($('fnc').value.trim()), b=nrmS($('fnv').value.trim());
-  for(let k=0;k<SPN.length;k++) okC[k]=(!a||SPN[k].includes(a))?1:0;
-  for(let k=0;k<VNN.length;k++) okV[k]=(!b||VNN[k].includes(b))?1:0; okV[VNN.length]=b?0:1;
-  const nc=okC.reduce((s,x)=>s+x,0), nv=VNN.reduce((s,_,k)=>s+okV[k],0);
-  $('fninfo').textContent=(a||b)?`Filtro ativo: ${a?f0(nc)+' nomes comerciais':'todos os nomes comerciais'} · ${b?f0(nv)+' nomes vulgares':'todos os nomes vulgares'} (a busca aceita parte do nome).`:'';
+const selC=new Set(), selV=new Set(), cntC=TR.sp.map(()=>[0,0]), cntV=VN.map(()=>[0,0]);
+TR.t.forEach(r=>{ cntC[r[2]][0]++; if(r[11]!=null) cntV[r[11]][0]++; }); R2.forEach(r=>{ cntC[r[2]][1]++; if(r[9]!=null) cntV[r[9]][1]++; });
+const lstC=TR.sp.map((_,k)=>k).filter(k=>cntC[k][0]+cntC[k][1]>0).sort((a,b)=>TR.sp[a].localeCompare(TR.sp[b],'pt-BR'));
+const lstV=VN.map((_,k)=>k).filter(k=>cntV[k][0]+cntV[k][1]>0).sort((a,b)=>VN[a].localeCompare(VN[b],'pt-BR'));
+function r2UI(){ let n=0,v=0,nc=0,vc=0;
+  for(let i=0;i<R2.length;i++){ const r=R2[i]; if(!okC[r[2]]||!okV[r[9]]) continue; n++; v+=r[3]; }
+  for(let i=0;i<TN;i++){ const r=TR.t[i]; if(!okC[r[2]]||!okV[r[11]]) continue; nc++; vc+=r[3]; }
+  $('r2n').textContent=f0(n)+' de '+f0(R2.length); $('cn').textContent=f0(nc)+' de '+f0(TN);
+  $('r2stat').innerHTML=`Com os filtros de nome: <b>Corte</b> ${f0(nc)} árv. · ${f0(vc)} m³ &nbsp;|&nbsp; <b>Remanescente 2</b> ${f0(n)} árv. · ${f0(v)} m³. A Remanescente 2 é só visualização: não entra nas somas, no corredor nem nas exportações.`; }
+function nameList(kind){ const isC=kind==='c', q=nrmS($(isC?'fnc':'fnv').value.trim()), L=isC?lstC:lstV, N=isC?SPN:VNN, nm=isC?TR.sp:VN, cnt=isC?cntC:cntV, sel=isC?selC:selV, vis=L.filter(k=>!q||N[k].includes(q));
+  $(isC?'lnc':'lnv').innerHTML=vis.map(k=>`<label class="chk"><input type="checkbox" data-nk="${kind}" data-k="${k}" ${sel.has(k)?'checked':''}><span>${esc(nm[k])}</span><span class="n">${f0(cnt[k][0])} · ${f0(cnt[k][1])}</span></label>`).join('')||'<p class="src" style="margin:4px 0">Nenhum nome encontrado.</p>';
+  return vis; }
+function nameFilter(){
+  for(let k=0;k<SPN.length;k++) okC[k]=(!selC.size||selC.has(k))?1:0;
+  for(let k=0;k<VNN.length;k++) okV[k]=(!selV.size||selV.has(k))?1:0; okV[VNN.length]=selV.size?0:1;
+  $('ncs').textContent=selC.size?`· ${selC.size} marcado${selC.size>1?'s':''}`:'· todos'; $('nvs').textContent=selV.size?`· ${selV.size} marcado${selV.size>1?'s':''}`:'· todos';
+  $('fninfo').textContent=(selC.size||selV.size)?'Filtro ativo: dentro de cada lista vale qualquer um dos nomes marcados; as duas listas se combinam (e).':'';
   treesSp(); spChanged(); r2UI(); }
-$('fnc').oninput=nameFilter; $('fnv').oninput=nameFilter;
+function nameInit(){ nameList('c'); nameList('v'); $('ncs').textContent='· todos'; $('nvs').textContent='· todos'; r2UI(); }
+[['c','fnc',selC],['v','fnv',selV]].forEach(([kind,id,sel])=>{
+  $(id).oninput=()=>nameList(kind);
+  $('l'+id.slice(1)).onchange=e=>{ const t=e.target; if(t.dataset.k===undefined) return; const k=+t.dataset.k; if(t.checked) sel.add(k); else sel.delete(k); nameFilter(); };
+  $(id+'_vis').onclick=()=>{ nameList(kind).forEach(k=>sel.add(k)); nameList(kind); nameFilter(); };
+  $(id+'_clr').onclick=()=>{ sel.clear(); $(id).value=''; nameList(kind); nameFilter(); }; });
 $('tr2').onchange=e=>{ tst.r2=e.target.checked; r2UI(); treesDraw(); };
 $('tsp').onchange=e=>{const t=e.target; if(t.dataset.sp===undefined) return; tsel[+t.dataset.sp]=t.checked?1:0; spChanged();};
 const capNum=v=>{ const c=parseFloat(String(v).replace(',','.')); return isFinite(c)&&c>0?c:0; };
@@ -1395,9 +1421,9 @@ $('tsave').onclick=()=>{
 map.on('move zoomend resize viewreset',treesDraw);
 map.on('zoomanim',e=>{ const sc=map.getZoomScale(e.zoom), off=map._latLngToNewLayerPoint(map.getBounds().getNorthWest(),e.zoom,e.center); L.DomUtil.setTransform(tcv,off,sc); }); map.on('zoomend',bufUpdate);
 map.on('click',e=>{
-  if(rulerOn||(typeof dr!=='undefined'&&dr.on)) return; if(!tst.on) return;
+  if(rulerOn||(typeof dr!=='undefined'&&dr.on)) return; if(!tst.on&&!tst.r2) return;
   const pc=map.latLngToContainerPoint(e.latlng); let best=-1,bd=8;
-  for(let i=0;i<TN;i++){ const r=TR.t[i]; if(!tok(r)) continue; const p=map.latLngToContainerPoint([r[1],r[0]]); const d=Math.hypot(p.x-pc.x,p.y-pc.y); if(d<bd){bd=d;best=i;} }
+  for(let i=0;i<(tst.on?TN:0);i++){ const r=TR.t[i]; if(!tok(r)) continue; const p=map.latLngToContainerPoint([r[1],r[0]]); const d=Math.hypot(p.x-pc.x,p.y-pc.y); if(d<bd){bd=d;best=i;} }
   let b2=-1, bd2=bd; if(tst.r2) for(let i=0;i<R2.length;i++){ const r=R2[i]; if(!okC[r[2]]||!okV[r[9]]) continue; const p=map.latLngToContainerPoint([r[1],r[0]]); const d=Math.hypot(p.x-pc.x,p.y-pc.y); if(d<bd2){bd2=d;b2=i;} }
   if(b2>=0){ const r=R2[b2], ut=(D.uts.find(u=>parseInt(u.ut,10)===r[6])||{ut:r[6]}).ut;
     L.popup().setLatLng([r[1],r[0]]).setContent(`<b><i class="dot" style="background:${SPC2[r[2]]}"></i>${esc(TR.sp[r[2]])}</b><div class="pk"><span>Classe</span><span>Remanescente 2</span><span>Nome vulgar</span><span>${esc(VN[r[9]]||'–')}</span><span>UT</span><span>${esc(ut)}</span><span>Faixa / nº</span><span>${r[7]||'–'} / ${r[8]||'–'}</span><span>DAP</span><span>${f1(r[4])} cm</span><span>Altura comercial</span><span>${f1(r[5])} m</span><span>Volume</span><span>${f2(r[3])} m³</span>${r[10]?'<span>Origem</span><span>Árvore esquecida (acrescentada após o censo)</span>':''}</div>`).openOn(map); return; }
