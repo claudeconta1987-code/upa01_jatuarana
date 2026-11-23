@@ -1305,11 +1305,18 @@ function r2UI(){ let n=0,v=0,nc=0,vc=0;
 function nameList(kind){ const isC=kind==='c', q=nrmS($(isC?'fnc':'fnv').value.trim()), L=isC?lstC:lstV, N=isC?SPN:VNN, nm=isC?TR.sp:VN, cnt=isC?cntC:cntV, sel=isC?selC:selV, vis=L.filter(k=>!q||N[k].includes(q));
   $(isC?'lnc':'lnv').innerHTML=vis.map(k=>`<label class="chk"><input type="checkbox" data-nk="${kind}" data-k="${k}" ${sel.has(k)?'checked':''}><span>${esc(nm[k])}</span><span class="n">${f0(cnt[k][0])} · ${f0(cnt[k][1])}</span></label>`).join('')||'<p class="src" style="margin:4px 0">Nenhum nome encontrado.</p>';
   return vis; }
+let tselSnap=null;
 function nameFilter(){
   for(let k=0;k<SPN.length;k++) okC[k]=(!selC.size||selC.has(k))?1:0;
   for(let k=0;k<VNN.length;k++) okV[k]=(!selV.size||selV.has(k))?1:0; okV[VNN.length]=selV.size?0:1;
   $('ncs').textContent=selC.size?`· ${selC.size} marcado${selC.size>1?'s':''}`:'· todos'; $('nvs').textContent=selV.size?`· ${selV.size} marcado${selV.size>1?'s':''}`:'· todos';
-  $('fninfo').textContent=(selC.size||selV.size)?'Filtro ativo: dentro de cada lista vale qualquer um dos nomes marcados; as duas listas se combinam (e).':'';
+  const act=selC.size||selV.size;
+  if(act){ if(!tselSnap) tselSnap=tsel.slice(); tsel.set(tselSnap); for(let i=0;i<TN;i++){ const r=TR.t[i]; if(okC[r[2]]&&okV[r[11]]) tsel[r[2]]=1; }   // o filtro de nome sobrepõe a lista de espécies desmarcadas
+    if(!tst.on){ tst.on=true; $('ton').checked=true; } }
+  else if(tselSnap){ tsel.set(tselSnap); tselSnap=null; }
+  let hc=0, ho=0;   // árvores de corte do filtro que seguem ocultas por outro filtro (CAP / só alcance)
+  if(act) for(let i=0;i<TN;i++){ const r=TR.t[i]; if(!okC[r[2]]||!okV[r[11]]) continue; if(r[4]<tmin[r[2]]||r[4]>tmax[r[2]]) hc++; else if(tst.only&&TD[i]>tst.R) ho++; }
+  $('fninfo').textContent=act?('Filtro ativo: dentro de cada lista vale qualquer um dos nomes marcados; as duas listas se combinam (e). O filtro de nome liga as espécies marcadas.'+(hc?` ${f0(hc)} árv. de corte ficam ocultas pelo filtro de CAP.`:'')+(ho?` ${f0(ho)} árv. de corte ficam ocultas por "só ≤${tst.R} m de estrada ativa".`:'')):'';
   treesSp(); spChanged(); r2UI(); }
 function nameInit(){ nameList('c'); nameList('v'); $('ncs').textContent='· todos'; $('nvs').textContent='· todos'; r2UI(); }
 [['c','fnc',selC],['v','fnv',selV]].forEach(([kind,id,sel])=>{
@@ -1318,16 +1325,16 @@ function nameInit(){ nameList('c'); nameList('v'); $('ncs').textContent='· todo
   $(id+'_vis').onclick=()=>{ nameList(kind).forEach(k=>sel.add(k)); nameList(kind); nameFilter(); };
   $(id+'_clr').onclick=()=>{ sel.clear(); $(id).value=''; nameList(kind); nameFilter(); }; });
 $('tr2').onchange=e=>{ tst.r2=e.target.checked; r2UI(); treesDraw(); };
-$('tsp').onchange=e=>{const t=e.target; if(t.dataset.sp===undefined) return; tsel[+t.dataset.sp]=t.checked?1:0; spChanged();};
+$('tsp').onchange=e=>{const t=e.target; if(t.dataset.sp===undefined) return; tsel[+t.dataset.sp]=t.checked?1:0; if(tselSnap) tselSnap[+t.dataset.sp]=tsel[+t.dataset.sp]; spChanged();};
 const capNum=v=>{ const c=parseFloat(String(v).replace(',','.')); return isFinite(c)&&c>0?c:0; };
 const capT={}; const deb=(f,key='x')=>{ clearTimeout(capT[key]); capT[key]=setTimeout(f,350); };
 const capSp=t=>{ const mx=t.dataset.capx!==undefined, k=+(mx?t.dataset.capx:t.dataset.cap), c=capNum(t.value); if(mx) tmax[k]=c?c/Math.PI:999; else tmin[k]=c?c/Math.PI:0; dapSave(); spRefresh(); spChanged(); };
 const capId=t=>t.dataset.cap!==undefined?'sp'+t.dataset.cap:t.dataset.capx!==undefined?'spx'+t.dataset.capx:null;
 $('tsp').addEventListener('input',e=>{ const t=e.target, id=capId(t); if(!id) return; t.value=t.value.replace(/[^0-9.,]/g,''); deb(()=>capSp(t),id); });
 $('tsp').addEventListener('change',e=>{ const t=e.target, id=capId(t); if(!id) return; clearTimeout(capT[id]); capSp(t); });
-$('tall').onclick=()=>{TR.spl.forEach(x=>tsel[x[0]]=1);treesSp();spChanged();};
-$('tnone').onclick=()=>{TR.spl.forEach(x=>tsel[x[0]]=0);treesSp();spChanged();};
-$('ttop').onclick=()=>{TR.spl.forEach((x,i)=>tsel[x[0]]=i<10?1:0);treesSp();spChanged();};
+$('tall').onclick=()=>{TR.spl.forEach(x=>tsel[x[0]]=1);if(tselSnap)tselSnap=tsel.slice();treesSp();spChanged();};
+$('tnone').onclick=()=>{TR.spl.forEach(x=>tsel[x[0]]=0);if(tselSnap)tselSnap=tsel.slice();treesSp();spChanged();};
+$('ttop').onclick=()=>{TR.spl.forEach((x,i)=>tsel[x[0]]=i<10?1:0);if(tselSnap)tselSnap=tsel.slice();treesSp();spChanged();};
 $('cscope').onchange=e=>{tst.scope=e.target.value;corUI();};
 function dl(name,text,mime){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:mime})); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500); }
 /* seleção de árvores do corredor (mesma regra do painel): dona = estrada mais próxima, ≤R m, escopo, espécies, DAP/CAP */
