@@ -1,6 +1,6 @@
 # UPA 01 · UMF I · FLONA Jatuarana: mapa para desenho de estradas
 
-Mapa interativo (arquivo único, `index.html`) com árvores de corte e remanescentes 2 (anel vazado, só visualização), filtro de espécies e por nome comercial/vulgar, APPs, UTs, SRTM e ferramenta de desenho de traçado com corredor de 300 m e volume por espécie.
+Mapa interativo (arquivo único, `index.html`) com árvores de corte e remanescentes 2 (estrela, só visualização), filtro de espécies e por nome comercial/vulgar, APPs, UTs, SRTM e ferramenta de desenho de traçado com corredor de 300 m e volume por espécie.
 
 ## Publicar no GitHub Pages
 1. Crie um repositório e envie `index.html` e este `README.md` para a raiz.

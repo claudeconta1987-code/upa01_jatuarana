@@ -901,7 +901,7 @@ h1{font-size:23px;font-weight:700;letter-spacing:-.02em}
     <h2>Árvores <span id="tcnt" style="font-weight:400;text-transform:none;letter-spacing:0"></span></h2>
     <label class="chk"><input type="checkbox" id="ton" checked><span><b>Mostrar Corte</b> (ponto cheio) <span class="n" id="cn"></span></span></label>
     <label class="chk"><input type="checkbox" id="tonly"><span><b>Só árvores dentro do buffer</b> das estradas ativas</span></label>
-    <label class="chk"><input type="checkbox" id="tr2" checked><span><b>Mostrar Remanescente 2</b> (anel vazado) <span class="n" id="r2n"></span></span></label>
+    <label class="chk"><input type="checkbox" id="tr2" checked><span><b>Mostrar Remanescente 2</b> (estrela) <span class="n" id="r2n"></span></span></label>
     <div class="src" id="r2stat" style="margin:0 0 6px"></div>
     <h3 style="margin:12px 0 0;font:600 11px/1 var(--font-body);text-transform:uppercase;letter-spacing:.09em;color:var(--muted)">Filtrar por nome <span style="font-weight:400;text-transform:none;letter-spacing:0">(marque um ou mais)</span></h3>
     <details class="nf" id="dnc"><summary>Nome comercial <span class="n" id="ncs"></span></summary>
@@ -1208,10 +1208,11 @@ function treesDraw(){
   else if(tst.mode==='cov'){ const all=[]; for(let k=0;k<TBY.length;k++) if(tsel[k]) for(const i of TBY[k]) all.push(i); batch(all,'#ffe600',1,false); batch(all,'#00c26e',1,true); }
   else { /* todas opacas; as dentro do corredor ganham anel branco e ficam um pouco maiores */
     for(const x of TR.spl){ const k=x[0]; if(!tsel[k]) continue; batch(TBY[k],SPC[k],1,false); if(tst.anySrc) batch(TBY[k],SPC[k],1,true,true); } }
-  if(tst.r2&&R2.length){ const rr=rad*1.2; g.lineWidth=z>=14.5?1.8:1.3;
+  if(tst.r2&&R2.length){ const ro=rad*1.9, ri=ro*0.45; g.lineWidth=z>=14.5?1:0.7; g.strokeStyle='rgba(10,20,15,.9)'; g.lineJoin='miter'; g.globalAlpha=1;   // Remanescente 2 = estrela de 5 pontas na cor da espécie
     for(let i=0;i<R2.length;i++){ const r=R2[i]; if(!okC[r[2]]||!okV[r[9]]) continue;
-      const p=map.latLngToContainerPoint([r[1],r[0]]); if(p.x<-8||p.y<-8||p.x>sz.x+8||p.y>sz.y+8) continue;
-      g.beginPath(); g.arc(p.x,p.y,rr,0,6.2832); g.globalAlpha=1; g.strokeStyle=tst.mode==='cls'?'#ff7a00':SPC2[r[2]]; g.stroke(); } }
+      const p=map.latLngToContainerPoint([r[1],r[0]]); if(p.x<-12||p.y<-12||p.x>sz.x+12||p.y>sz.y+12) continue;
+      g.beginPath(); for(let q=0;q<10;q++){ const a=-1.5708+q*0.62832, rv=q%2?ri:ro; const X=p.x+rv*Math.cos(a), Y=p.y+rv*Math.sin(a); q?g.lineTo(X,Y):g.moveTo(X,Y); } g.closePath();
+      g.fillStyle=tst.mode==='cls'?'#ff7a00':SPC2[r[2]]; g.fill(); g.stroke(); } }
   g.globalAlpha=1;
 }
 function bufUpdate(){
@@ -1234,7 +1235,7 @@ function treesLeg(){
   const onlyMsg=tst.only?`<div class="src" style="margin:0 0 6px;color:var(--accent);font-weight:600">Mostrando só as árvores a ≤${tst.R} m de estrada ativa${tst.anySrc?'':' — nenhuma estrada desenhada ativa (vale só o acesso GPS, se visível)'}.</div>`:'';
   $('tleg').innerHTML=onlyMsg+(tst.mode==='cov'
    ?`<div class="lg" style="grid-template-columns:22px 1fr"><span><i class="dot" style="background:#00c26e"></i></span><span>a até ${tst.R} m de uma estrada ativa</span></div><div class="lg" style="grid-template-columns:22px 1fr"><span><i class="dot" style="background:#ffe600"></i></span><span>fora do alcance das estradas ativas</span></div>`
-   :tst.mode==='cls'?`<div class="clsleg"><span><i style="background:#1b9e5a"></i>Corte (ponto cheio)</span><span><i style="background:#fff;border:2px solid #ff7a00"></i>Remanescente 2 (anel)</span></div>`:`<div class="clsleg"><span><i style="background:#999"></i>Corte: ponto cheio</span><span><i style="background:#fff;border:2px solid #999"></i>Remanescente 2: anel vazado</span></div><div class="lg" style="grid-template-columns:1fr"><span class="src">Cada cor é uma espécie (veja a lista abaixo).${tst.anySrc?' Árvores maiores (com anel branco no zoom aproximado) estão dentro do corredor das estradas ativas.':''}</span></div>`);
+   :tst.mode==='cls'?`<div class="clsleg"><span><i style="background:#1b9e5a"></i>Corte (ponto cheio)</span><span><b style="color:#ff7a00;font-size:15px;line-height:1">★</b> Remanescente 2 (estrela)</span></div>`:`<div class="clsleg"><span><i style="background:#999"></i>Corte: ponto cheio</span><span><b style="color:#999;font-size:15px;line-height:1">★</b> Remanescente 2: estrela</span></div><div class="lg" style="grid-template-columns:1fr"><span class="src">Cada cor é uma espécie (veja a lista abaixo).${tst.anySrc?' Árvores maiores (com anel branco no zoom aproximado) estão dentro do corredor das estradas ativas.':''}</span></div>`);
 }
 function treesStats(){
   let n=0,v=0,nc=0,vc=0; const R=tst.R;
