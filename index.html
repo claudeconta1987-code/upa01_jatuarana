@@ -940,17 +940,17 @@ h1{font-size:23px;font-weight:700;letter-spacing:-.02em}
     <div class="brow"><button type="button" class="btn" id="tsave">Baixar seleção (JSON)</button><a class="btn" href="arvores_corte_remanescente2_upa01.xlsx" download style="display:inline-block;text-decoration:none;text-align:center" title="19.370 árvores de corte e remanescente 2, com filtro por nome comercial e nome vulgar">Baixar lista completa (XLSX)</a></div>
   </section>
   <section id="projsec">
-    <h2>Projeção de remanescentes <span id="pjcnt" style="font-weight:400;text-transform:none;letter-spacing:0"></span></h2>
-    <p class="src">Junte UTs para tratá-las como uma só unidade de manejo. Com mais indivíduos por espécie a densidade (árv./100 ha) sobe, a exigência de remanescentes muda e árvores hoje em Remanescente 2 podem voltar ao corte (ou o contrário). É uma simulação: não altera os dados nem as somas do mapa.</p>
+    <h2>Projeção de remanescentes · IPÊ <span id="pjcnt" style="font-weight:400;text-transform:none;letter-spacing:0"></span></h2>
+    <p class="src">Junte UTs para tratá-las como uma só unidade de manejo e veja o efeito só em IPÊ ROXO e IPÊ AMARELO (nome comercial): a densidade (árv./100 ha) da junta muda a exigência de remanescentes e árvores hoje em Remanescente 2 podem voltar ao corte (ou o contrário). Simulação: não altera os dados nem as somas do mapa.</p>
     <input class="inp" type="text" id="pjtxt" placeholder="UTs a juntar, ex.: 1-4, 7, 12" aria-label="UTs a juntar" autocomplete="off">
     <div class="utgrid" id="pjgrid"></div>
-    <div class="brow"><button type="button" class="btn sm" id="pjnb">Sugerir UTs vizinhas</button><button type="button" class="btn sm" id="pjclr">Limpar</button><button type="button" class="btn pri sm" id="pjxl">Baixar Excel da projeção</button></div>
+    <div class="brow"><button type="button" class="btn sm" id="pjnb">Sugerir UTs vizinhas</button><button type="button" class="btn sm" id="pjbest" title="Busca, entre UTs vizinhas, as junções que mais liberam corte de IPÊ">Buscar melhores junções</button><label class="src" style="display:inline-flex;align-items:center;gap:4px">até <input type="number" id="pjmx" min="2" max="8" value="4" style="width:46px" class="inp"> UTs</label><button type="button" class="btn sm" id="pjclr">Limpar</button><button type="button" class="btn pri sm" id="pjxl">Baixar Excel da projeção</button></div>
     <div class="pjsug" id="pjsug"></div>
     <label class="chk"><input type="checkbox" id="pjmap" checked><span>Mostrar no mapa o que muda de classe</span></label>
     <label class="chk"><input type="checkbox" id="pjdim" checked><span>Esmaecer as demais árvores</span></label>
     <div class="clsleg" id="pjleg" style="margin-top:6px"><span><i style="background:#19d27a;border:1.5px solid #fff;box-shadow:0 0 0 1px #0b5"></i>passa a Corte (hoje Rem. 2)</span><span><b style="color:#ff2d55;font-size:15px;line-height:1">★</b> passa a Rem. 2 (hoje Corte)</span></div>
     <div class="stats" id="pjstats" style="margin-top:8px"></div>
-    <label class="chk" style="margin-top:8px"><input type="checkbox" id="pjall"><span>Mostrar todas as espécies da junta (padrão: só as que mudam ou têm restrição)</span></label>
+    <label class="chk" style="margin-top:8px"><input type="checkbox" id="pjall"><span>Mostrar também quando não há mudança nem restrição</span></label>
     <div class="tw" style="max-height:340px;overflow:auto;margin-top:6px"><table id="pjtbl"><thead><tr><th>Espécie · indivíduos acima do DMC</th><th title="Classe da espécie na junta (hoje = UTs separadas)">Classe na junta</th><th title="Remanescente 2: atual → projetado, e efeito no corte">Rem. 2 (atual → junta)</th></tr></thead><tbody></tbody></table></div>
     <div class="src" id="pjnote" style="margin-top:6px"></div>
   </section>
@@ -1379,11 +1379,11 @@ const pjRule=(k,F,A)=>{ const d=PJ.d[k]; if(!d||d[4]||!F) return {G:0,J:'–',M:
   const G=F/A*100; const J=d[3]?(G<5?'Rara':'Normal'):(G<=d[2]?'Pouco abundante':'Normal');
   return {G,J,M:J!=='Normal'?F:Math.max(pjRoundUp(F*d[1]),pjRoundUp(d[2]*A/100))}; };
 const pjVf=i=>Pvn[i]>=0?PJ.vf[Pvn[i]]:0;
-const pjSet=new Set(); let pjRes=null, pjCls=new Int8Array(PN).fill(-1), pjChg=[], pjNbC=null;
+const PJSP=new Set(['IPÊ ROXO','IPÊ AMARELO']), pjSet=new Set(); let pjRes=null, pjCls=new Int8Array(PN).fill(-1), pjChg=[], pjNbC=null;
 function pjCalc(uts){
   const inS=new Uint8Array(52); uts.forEach(u=>inS[u]=1); const A=uts.reduce((a,u)=>a+pjA(u),0), cls=new Int8Array(PN).fill(-1), rows=[];
   const T={A,n:uts.length,elig:0,c0:0,c1:0,v0:0,v1:0,r0:0,r1:0,toC:0,toR:0,vToC:0,vToR:0};
-  for(let k=0;k<NSPJ;k++){ if(!PJ.d[k]||PJ.d[k][4]) continue;
+  for(let k=0;k<NSPJ;k++){ if(!PJ.d[k]||PJ.d[k][4]||!PJSP.has(TR.sp[k])) continue;   // só IPÊ ROXO e IPÊ AMARELO
     const list=PBS[k].filter(i=>inS[Put[i]]); let pq=0; uts.forEach(u=>{ pq+=PQa[u*NSPJ+k]; });
     const F=list.length+pq; if(!F) continue;
     const ru=pjRule(k,F,A); let Msep=0, restr=0, nU=0;
@@ -1422,7 +1422,7 @@ function pjRender(){
   const all=$('pjall').checked, vis=rows.filter(R=>all||R.toC||R.toR||R.J!=='Normal'||R.restr);
   tb.innerHTML=vis.map(R=>{ const cl=R.J==='Normal'?'':` style="color:#c2184b;font-weight:600"`, ch=R.toC||R.toR;
     const dTxt=R.dc||R.dv?`<small class="${R.dv>0?'up':R.dv<0?'dn':''}">Δ corte ${sg(R.dc)}${f0(Math.abs(R.dc))} árv. · ${sg(R.dv)}${f1(Math.abs(R.dv))} m³</small>`:'';
-    return `<tr><td><i class="dot" style="background:${SPC2[R.k]}"></i>${esc(TR.sp[R.k])}<small>${f0(R.F)} indiv. · ${f1(R.G)} árv./100 ha</small></td><td><span${cl}>${R.J}</span>${R.nU>1?`<small>hoje: ${R.restr} de ${R.nU} UTs restritas</small>`:''}</td><td>${R.r0}${R.r0!==R.r1?` → <b>${R.r1}</b>`:''}${ch?`<small>${R.toC?R.toC+' → Corte':''}${R.toC&&R.toR?' · ':''}${R.toR?R.toR+' → Rem. 2':''}</small>`:''}${dTxt}</td></tr>`; }).join('')||'<tr><td colspan="3" class="src">Nenhuma espécie muda de classe com essa junção.</td></tr>';
+    return `<tr><td><i class="dot" style="background:${SPC2[R.k]}"></i>${esc(TR.sp[R.k])}<small>${f0(R.F)} indiv. · ${f1(R.G)} árv./100 ha</small></td><td><span${cl}>${R.J}</span>${R.nU>1?`<small>hoje: ${R.restr} de ${R.nU} UTs restritas</small>`:''}</td><td>${R.r0}${R.r0!==R.r1?` → <b>${R.r1}</b>`:''}${ch?`<small>${R.toC?R.toC+' → Corte':''}${R.toC&&R.toR?' · ':''}${R.toR?R.toR+' → Rem. 2':''}</small>`:''}${dTxt}</td></tr>`; }).join('')||'<tr><td colspan="3" class="src">Nem IPÊ ROXO nem IPÊ AMARELO mudam de classe com essa junção.</td></tr>';
   nt.textContent=pjSet.size===1?'Com uma UT só a projeção reproduz o estado atual (confere com a planilha).':`Regra aplicada à junta como se fosse uma UT: indivíduos acima do DMC (inclui porta-sementes) ÷ área sem APP; espécie "Pouco abundante" (≤ piso de árv./100 ha) ou "Rara" (prioritária < 5 árv./100 ha) retém todas; nas demais retém o maior entre % mínimo × indivíduos e piso × área. Retidas: as de menor DAP (prioritárias primeiro). Nomes vulgares "reter 100%" seguem como Rem. 2.`; }
 function pjRun(){
   pjUtHl(); const sel=[...pjSet].sort((a,b)=>a-b);
@@ -1440,9 +1440,15 @@ $('pjall').onchange=()=>pjRender();
 $('pjmap').onchange=()=>treesDraw(); $('pjdim').onchange=()=>treesDraw();
 $('pjnb').onclick=()=>{ const el=$('pjsug'); if(!pjSet.size){ el.innerHTML='<span class="src">Marque primeiro uma ou mais UTs.</span>'; return; }
   const nb=pjAdj(), cand=new Set(); pjSet.forEach(u=>nb[u].forEach(v=>{ if(!pjSet.has(v)) cand.add(v); }));
-  const base=pjCalc([...pjSet]).T, L2=[...cand].map(v=>{ const t=pjCalc([...pjSet,v]).T; return {v,dn:t.c1-base.c1,dv:t.v1-base.v1}; }).sort((a,b)=>b.dv-a.dv);
-  el.innerHTML=L2.length?L2.map(x=>`<button type="button" class="btn sm" data-add="${x.v}" title="Efeito de acrescentar a UT ${x.v} à junta">+ UT ${String(x.v).padStart(2,'0')} · ${x.dv>=0?'+':'−'}${f1(Math.abs(x.dv))} m³ de corte</button>`).join(''):'<span class="src">Nenhuma UT vizinha encontrada.</span>'; };
-$('pjsug').onclick=e=>{ const b=e.target.closest('[data-add]'); if(!b) return; pjSet.add(+b.dataset.add); pjRun(); $('pjnb').click(); };
+  const base=pjCalc([...pjSet]).T, nIpe=v=>{ let n=0; TR.sp.forEach((nm,k)=>{ if(PJSP.has(nm)) n+=EUT[v*NSPJ+k]+PQa[v*NSPJ+k]; }); return n; };
+  const L2=[...cand].map(v=>{ const t=pjCalc([...pjSet,v]).T; return {v,dn:t.c1-base.c1,dv:t.v1-base.v1,ni:nIpe(v)}; }).sort((a,b)=>b.dv-a.dv||b.dn-a.dn||b.ni-a.ni);
+  el.innerHTML=L2.length?L2.map(x=>`<button type="button" class="btn sm" data-add="${x.v}" title="Efeito de acrescentar a UT ${x.v} à junta (IPÊ)">+ UT ${String(x.v).padStart(2,'0')} · ${x.ni} IPÊ · corte ${x.dn>=0?'+':'−'}${Math.abs(x.dn)} árv. · ${x.dv>=0?'+':'−'}${f1(Math.abs(x.dv))} m³</button>`).join(''):'<span class="src">Nenhuma UT vizinha encontrada.</span>'; };
+$('pjbest').onclick=()=>{ const el=$('pjsug'), mx=Math.max(2,Math.min(8,+$('pjmx').value||4)), nb=pjAdj(), seen=new Map();
+  PUT.forEach(u=>{ let S=[u], cur=0; while(S.length<mx){ const cand=new Set(); S.forEach(x=>nb[x].forEach(v=>{ if(!S.includes(v)) cand.add(v); })); let bv=null, bd=cur; cand.forEach(v=>{ const t=pjCalc([...S,v]).T, d=t.v1-t.v0; if(d>bd+0.01){ bd=d; bv=v; } }); if(bv==null) break; S.push(bv); cur=bd; }
+    if(S.length>1){ S.sort((a,b)=>a-b); const k=S.join('+'); if(!seen.has(k)) seen.set(k,{S,dv:cur}); } });
+  const L2=[...seen.values()].sort((a,b)=>b.dv-a.dv).slice(0,8);
+  el.innerHTML=L2.length?'<span class="src" style="flex-basis:100%">Melhores junções de vizinhas (até '+mx+' UTs), pelo volume de corte de IPÊ liberado:</span>'+L2.map(x=>{ const t=pjCalc(x.S).T; return `<button type="button" class="btn sm" data-set="${x.S.join(',')}">UTs ${x.S.join(', ')} · corte ${t.c1-t.c0>=0?'+':'−'}${Math.abs(t.c1-t.c0)} árv. · +${f1(x.dv)} m³</button>`; }).join(''):'<span class="src">Nenhuma junção de vizinhas libera corte de IPÊ.</span>'; };
+$('pjsug').onclick=e=>{ const q=e.target.closest('[data-set]'); if(q){ pjSet.clear(); q.dataset.set.split(',').forEach(u=>pjSet.add(+u)); pjRun(); return; } const b=e.target.closest('[data-add]'); if(!b) return; pjSet.add(+b.dataset.add); pjRun(); $('pjnb').click(); };
 const pcv=document.createElement('canvas'); pcv.className='leaflet-zoom-animated'; pcv.style.position='absolute'; pcv.style.pointerEvents='none'; map.getPane('trees').appendChild(pcv);
 pjHook=(g0,sz,rad)=>{ const dpr=Math.min(2,window.devicePixelRatio||1);
   if(pcv.width!==sz.x*dpr||pcv.height!==sz.y*dpr){ pcv.width=sz.x*dpr; pcv.height=sz.y*dpr; pcv.style.width=sz.x+'px'; pcv.style.height=sz.y+'px'; }
@@ -1467,7 +1473,7 @@ $('pjxl').onclick=()=>{
   const ch=pjChg.slice().sort((a,b)=>Put[a]-Put[b]||Psp[a]-Psp[b]||a-b).map(i=>{ const r=i<TN?TR.t[i]:R2[i-TN], vn=Pvn[i]>=0?VN[Pvn[i]]:'';
     return [N(Put[i],4),i<TN?r[7]||'':r[7]||'',i<TN?r[8]||'':r[8]||'',TR.sp[Psp[i]],vn,N(r[4],2),N(r[5],2),N(q(r[3]),3),dsc[Pcur[i]],dsc[pjCls[i]],N(r[0],5),N(r[1],5)]; });
   const sel=[...pjSet].sort((a,b)=>a-b);
-  const par=[[H('Parâmetro'),H('Valor')],['Mapa','UPA 01 · UMF I · FLONA Jatuarana'],['Gerado em',new Date().toLocaleString('pt-BR')],['UTs juntadas',pjUtList(pjSet)],['Área da junta, sem APP (ha)',N(Math.round(T.A*100)/100,8)],['Árvores acima do DMC na junta (Corte + Rem. 2)',N(T.elig,4)],['Corte atual → projetado (árv.)',`${f0(T.c0)} → ${f0(T.c1)}`],['Corte atual → projetado (m³)',`${f1(T.v0)} → ${f1(T.v1)}`],['Rem. 2 atual → projetada (árv.)',`${f0(T.r0)} → ${f0(T.r1)}`],
+  const par=[[H('Parâmetro'),H('Valor')],['Mapa','UPA 01 · UMF I · FLONA Jatuarana'],['Gerado em',new Date().toLocaleString('pt-BR')],['UTs juntadas',pjUtList(pjSet)],['Espécies simuladas (nome comercial)','IPÊ ROXO e IPÊ AMARELO'],['Área da junta, sem APP (ha)',N(Math.round(T.A*100)/100,8)],['Árvores acima do DMC na junta (Corte + Rem. 2)',N(T.elig,4)],['Corte atual → projetado (árv.)',`${f0(T.c0)} → ${f0(T.c1)}`],['Corte atual → projetado (m³)',`${f1(T.v0)} → ${f1(T.v1)}`],['Rem. 2 atual → projetada (árv.)',`${f0(T.r0)} → ${f0(T.r1)}`],
     ['Regra',"Igual à da planilha (R2 por UT + espécie), aplicada à junta como uma única UT"],['Densidade','indivíduos acima do DMC (inclui porta-sementes) ÷ área sem APP × 100'],['Espécie prioritária (IN Ibama 28/2024)','< 5 árv./100 ha: "Rara" (retém todas)'],['Demais espécies','≤ piso (árv./100 ha): "Pouco abundante" (retém todas)'],['Espécie "Normal"','retém o maior entre ⌈% mínimo × indivíduos⌉ e ⌈piso × área ÷ 100⌉'],['Quais árvores ficam','as de menor DAP; nomes vulgares prioritários primeiro; empate: quem já era Rem. 2'],['Nome vulgar "reter 100%"','permanece Remanescente 2'],['Observação','Simulação para apoio ao planejamento; não substitui a validação do órgão ambiental.']];
   const blob=xlsxBlob([{name:'Resumo por espécie',widths:[26,14,14,16,12,12,16,14,12,12,12,12,12,12,13,13,14],rows:[head].concat(body),filter:true,freeze:true},{name:'Árvores que mudam',widths:[6,7,9,26,22,10,12,12,16,16,12,12],rows:[h2].concat(ch),filter:true,freeze:true},{name:'Parâmetros',widths:[44,70],rows:par,freeze:false}]);
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='projecao_remanescentes_UTs_'+(sel.length>6?sel.length+'UTs':sel.map(u=>String(u).padStart(2,'0')).join('-'))+'_UPA01.xlsx'; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},800);
