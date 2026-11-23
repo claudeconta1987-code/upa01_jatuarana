@@ -907,7 +907,7 @@ h1{font-size:23px;font-weight:700;letter-spacing:-.02em}
     <h2>Árvores <span id="tcnt" style="font-weight:400;text-transform:none;letter-spacing:0"></span></h2>
     <label class="chk"><input type="checkbox" id="ton" checked><span><b>Mostrar Corte</b> (ponto cheio) <span class="n" id="cn"></span></span></label>
     <label class="chk"><input type="checkbox" id="tonly"><span><b>Só árvores dentro do buffer</b> das estradas ativas</span></label>
-    <label class="chk"><input type="checkbox" id="tr2" checked><span><b>Mostrar Remanescente 2</b> (estrela) <span class="n" id="r2n"></span></span></label>
+    <label class="chk"><input type="checkbox" id="tr2" checked><span><b>Mostrar Remanescente 2</b> (estrela; ▲ = IPÊ com outro nome vulgar) <span class="n" id="r2n"></span></span></label>
     <div class="src" id="r2stat" style="margin:0 0 6px"></div>
     <h3 style="margin:12px 0 0;font:600 11px/1 var(--font-body);text-transform:uppercase;letter-spacing:.09em;color:var(--muted)">Filtrar por nome <span style="font-weight:400;text-transform:none;letter-spacing:0">(marque um ou mais)</span></h3>
     <details class="nf" id="dnc"><summary>Nome comercial <span class="n" id="ncs"></span></summary>
@@ -1187,7 +1187,7 @@ const TXm=new Float64Array(TN), TYm=new Float64Array(TN), TD=new Float32Array(TN
 TR.t.forEach((r,i)=>{ TXm[i]=(r[0]+59.7)*KX; TYm[i]=(r[1]+7.47)*KY; r[9]=i; });
 const tsel=new Uint8Array(TR.sp.length); TR.spl.forEach(x=>tsel[x[0]]=1);
 const tmin=new Float32Array(TR.sp.length), tmax=new Float32Array(TR.sp.length).fill(999);
-const VN=TR.vn||[], R2=TR.r2||[], nrmS=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const VN=TR.vn||[], R2=TR.r2||[], R2T=new Uint8Array((TR.r2||[]).length), nrmS=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const SPN=TR.sp.map(nrmS), VNN=VN.map(nrmS), okC=new Uint8Array(TR.sp.length).fill(1), okV=new Uint8Array(VN.length+1).fill(1);
 const tok=r=>tsel[r[2]]&&okC[r[2]]&&okV[r[11]]&&r[4]>=tmin[r[2]]&&r[4]<=tmax[r[2]]&&(!tst.only||TD[r[9]]<=tst.R);
 const tst={only:false,on:true,R:300,q:'',scope:'all',mode:'sp',anySrc:false,r2:true}; let pjHook=null;
@@ -1213,6 +1213,8 @@ function distLine(pts,out){   // distância (m) de cada árvore à linha (pts em
   return out;
 }
 const getD=x=>{ let d=dcache.get(x); if(!d){ d=distLine(x.pts); dcache.set(x,d);} return d; };
+{ const ipe=new Set(['IPÊ AMARELO','IPÊ ROXO']); R2.forEach((r,j)=>{ const sn=TR.sp[r[2]]; if(ipe.has(sn)&&r[9]!=null&&VN[r[9]]!==sn) R2T[j]=1; }); }   // Rem. 2 de IPÊ (nome comercial) cujo nome vulgar é outra espécie → triângulo
+const R2Tn=R2T.reduce((a,b)=>a+b,0);
 function treesDraw(){
   const sz=map.getSize(), dpr=Math.min(2,window.devicePixelRatio||1);
   if(tcv.width!==sz.x*dpr||tcv.height!==sz.y*dpr){ tcv.width=sz.x*dpr; tcv.height=sz.y*dpr; tcv.style.width=sz.x+'px'; tcv.style.height=sz.y+'px'; }
@@ -1232,7 +1234,8 @@ function treesDraw(){
   if(tst.r2&&R2.length){ const ro=rad*1.9, ri=ro*0.45; g.lineWidth=z>=14.5?1:0.7; g.strokeStyle='rgba(10,20,15,.9)'; g.lineJoin='miter'; g.globalAlpha=1;   // Remanescente 2 = estrela de 5 pontas na cor da espécie
     for(let i=0;i<R2.length;i++){ const r=R2[i]; if(!okC[r[2]]||!okV[r[9]]) continue;
       const p=map.latLngToContainerPoint([r[1],r[0]]); if(p.x<-12||p.y<-12||p.x>sz.x+12||p.y>sz.y+12) continue;
-      g.beginPath(); for(let q=0;q<10;q++){ const a=-1.5708+q*0.62832, rv=q%2?ri:ro; const X=p.x+rv*Math.cos(a), Y=p.y+rv*Math.sin(a); q?g.lineTo(X,Y):g.moveTo(X,Y); } g.closePath();
+      g.beginPath(); if(R2T[i]){ const rt=ro*1.1; for(let q=0;q<3;q++){ const a=-1.5708+q*2.0944, X=p.x+rt*Math.cos(a), Y=p.y+rt*Math.sin(a)*1+ (q?0:0); q?g.lineTo(X,Y):g.moveTo(X,Y); } }
+      else for(let q=0;q<10;q++){ const a=-1.5708+q*0.62832, rv=q%2?ri:ro; const X=p.x+rv*Math.cos(a), Y=p.y+rv*Math.sin(a); q?g.lineTo(X,Y):g.moveTo(X,Y); } g.closePath();
       g.fillStyle=tst.mode==='cls'?'#ff7a00':SPC2[r[2]]; g.fill(); g.stroke(); } }
   g.globalAlpha=1;
   if(pjHook) pjHook(g,sz,rad);
@@ -1257,7 +1260,7 @@ function treesLeg(){
   const onlyMsg=tst.only?`<div class="src" style="margin:0 0 6px;color:var(--accent);font-weight:600">Mostrando só as árvores a ≤${tst.R} m de estrada ativa${tst.anySrc?'':' — nenhuma estrada desenhada ativa (vale só o acesso GPS, se visível)'}.</div>`:'';
   $('tleg').innerHTML=onlyMsg+(tst.mode==='cov'
    ?`<div class="lg" style="grid-template-columns:22px 1fr"><span><i class="dot" style="background:#00c26e"></i></span><span>a até ${tst.R} m de uma estrada ativa</span></div><div class="lg" style="grid-template-columns:22px 1fr"><span><i class="dot" style="background:#ffe600"></i></span><span>fora do alcance das estradas ativas</span></div>`
-   :tst.mode==='cls'?`<div class="clsleg"><span><i style="background:#1b9e5a"></i>Corte (ponto cheio)</span><span><b style="color:#ff7a00;font-size:15px;line-height:1">★</b> Remanescente 2 (estrela)</span></div>`:`<div class="clsleg"><span><i style="background:#999"></i>Corte: ponto cheio</span><span><b style="color:#999;font-size:15px;line-height:1">★</b> Remanescente 2: estrela</span></div><div class="lg" style="grid-template-columns:1fr"><span class="src">Cada cor é uma espécie (veja a lista abaixo).${tst.anySrc?' Árvores maiores (com anel branco no zoom aproximado) estão dentro do corredor das estradas ativas.':''}</span></div>`);
+   :tst.mode==='cls'?`<div class="clsleg"><span><i style="background:#1b9e5a"></i>Corte (ponto cheio)</span><span><b style="color:#ff7a00;font-size:15px;line-height:1">★</b> Remanescente 2 (estrela)</span>${R2Tn?`<span><b style="color:#ff7a00;font-size:14px;line-height:1">▲</b> Rem. 2 de IPÊ com outro nome vulgar (${R2Tn})</span>`:''}</div>`:`<div class="clsleg"><span><i style="background:#999"></i>Corte: ponto cheio</span><span><b style="color:#999;font-size:15px;line-height:1">★</b> Remanescente 2: estrela</span>${R2Tn?`<span><b style="color:#999;font-size:14px;line-height:1">▲</b> Rem. 2 de IPÊ com outro nome vulgar (${R2Tn})</span>`:''}</div><div class="lg" style="grid-template-columns:1fr"><span class="src">Cada cor é uma espécie (veja a lista abaixo).${tst.anySrc?' Árvores maiores (com anel branco no zoom aproximado) estão dentro do corredor das estradas ativas.':''}</span></div>`);
 }
 function treesStats(){
   let n=0,v=0,nc=0,vc=0; const R=tst.R;
@@ -1451,6 +1454,7 @@ pjHook=(g0,sz,rad)=>{ const dpr=Math.min(2,window.devicePixelRatio||1);
     const p=map.latLngToContainerPoint([r[1],r[0]]); if(p.x<-14||p.y<-14||p.x>sz.x+14||p.y>sz.y+14) continue;
     g.lineWidth=1.4; g.strokeStyle='#fff';
     if(pjCls[i]===0){ g.beginPath(); g.arc(p.x,p.y,rad*1.55,0,6.2832); g.fillStyle='#19d27a'; g.fill(); g.stroke(); g.lineWidth=0.8; g.strokeStyle='#0b5'; g.beginPath(); g.arc(p.x,p.y,rad*1.55+1.2,0,6.2832); g.stroke(); }
+    else if(i>=TN&&R2T[i-TN]){ const rt=rad*2.3; g.beginPath(); for(let q=0;q<3;q++){ const a=-1.5708+q*2.0944, X=p.x+rt*Math.cos(a), Y=p.y+rt*Math.sin(a); q?g.lineTo(X,Y):g.moveTo(X,Y); } g.closePath(); g.fillStyle='#ff2d55'; g.fill(); g.stroke(); }
     else { const ro=rad*2.1, ri=ro*0.45; g.beginPath(); for(let q=0;q<10;q++){ const a=-1.5708+q*0.62832, rv=q%2?ri:ro, X=p.x+rv*Math.cos(a), Y=p.y+rv*Math.sin(a); q?g.lineTo(X,Y):g.moveTo(X,Y); } g.closePath(); g.fillStyle='#ff2d55'; g.fill(); g.stroke(); } } };
 const pjPop=i=>{ if(!pjSet.size||pjCls[i]<0) return ''; return `<span>Projeção (UTs ${pjUtList(pjSet)} juntas)</span><span>${pjCls[i]?'Remanescente 2':'Corte'}${pjCls[i]!==Pcur[i]?' <b>(muda)</b>':''}</span>`; };
 $('pjxl').onclick=()=>{
